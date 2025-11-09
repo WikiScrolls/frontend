@@ -29,22 +29,28 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: Stack(
+        children: [
+          Positioned.fill(child: Image.asset('assets/images/bg4.png', fit: BoxFit.cover)),
+          Positioned.fill(child: Container(color: Colors.black.withOpacity(0.1))),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
               Text(
                 "Let's Login to Your\nAccount!",
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppColors.lightBrown,
                       fontWeight: FontWeight.w700,
@@ -54,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 12),
               Text(
                 "Welcome back! Your personalized feed is ready and waiting with new topics we think you'll find fascinating. Pick up right where you left off, explore your saved scrolls, and continue your journey of discovery.",
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                     ),
@@ -78,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.lightBrown,
-                    foregroundColor: Colors.black,
+                    foregroundColor: AppColors.darkBrown, // dark brown text color per design
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
@@ -122,9 +129,11 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               _LegalFooter(),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

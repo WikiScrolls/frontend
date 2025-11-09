@@ -15,6 +15,7 @@ class OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final centerContent = body != null; // Center when we have both title and body (welcome page)
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -27,20 +28,20 @@ class OnboardingPage extends StatelessWidget {
             ),
           ),
         ),
-        // Dark overlay
-        Container(color: Colors.black.withOpacity(0.55)),
+  // Dark overlay with subtle texture compatibility
+  Container(color: Colors.black.withOpacity(0.6)),
         // Content
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: centerContent ? CrossAxisAlignment.center : CrossAxisAlignment.start,
               children: [
                 const Spacer(flex: 10),
                 // Title
                 Text(
                   title,
-                  textAlign: TextAlign.left,
+                  textAlign: centerContent ? TextAlign.center : TextAlign.left,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         color: Colors.white,
                         fontSize: size.width * 0.12,
@@ -58,6 +59,7 @@ class OnboardingPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     body!,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withOpacity(0.9),
                           fontSize: 14,

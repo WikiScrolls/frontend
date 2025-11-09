@@ -14,7 +14,7 @@ class GradientButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.darkBrown, AppColors.orange],
+            colors: [AppColors.darkBrown, AppColors.orangeDark],
           ),
           borderRadius: BorderRadius.all(Radius.circular(18)),
         ),
@@ -28,7 +28,12 @@ class GradientButton extends StatelessWidget {
           onPressed: onPressed,
           child: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              // Sign Up buttons should use the same color as headings (lightBrown)
+              color: AppColors.lightBrown,
+            ),
           ),
         ),
       ),
