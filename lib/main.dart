@@ -3,7 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_colors.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const WikiScrollsApp());
 }
 
@@ -21,7 +22,7 @@ class WikiScrollsApp extends StatelessWidget {
           primary: AppColors.orange,
           secondary: AppColors.darkBrown,
         ),
-  // Use Source Serif 4 (replacement for Source Serif Pro in Google Fonts)
+  // Use Source Serif 4 for all text styles (including display & headline)
   textTheme: GoogleFonts.sourceSerif4TextTheme(baseTheme.textTheme),
         scaffoldBackgroundColor: Colors.black,
         inputDecorationTheme: const InputDecorationTheme(
