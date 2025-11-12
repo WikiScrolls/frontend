@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../state/user_profile.dart';
+import '../api/article_service.dart';
+import '../api/models/article.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,8 +41,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _FeedPage extends StatelessWidget {
+class _FeedPage extends StatefulWidget {
   const _FeedPage();
+
+  @override
+  State<_FeedPage> createState() => _FeedPageState();
+}
+
+class _FeedPageState extends State<_FeedPage> {
+  final _service = ArticleService();
+  List<ArticleModel> _articles = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _service.listArticles(page: 1, limit: 5);
+      setState(() {
+        _articles = result.$1;
+      });
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,78 +115,130 @@ class _FeedPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // Content area
             Expanded(
-              child: Stack(
-                children: [
-                  // Center big title
-                  Center(
-                    child: Text(
-                      'The\nContent\nWill Be\nShown\nHere',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            height: 1.05,
-                          ),
-                    ),
-                  ),
-                  // Right vertical actions
-                  Positioned(
-                    right: 8,
-                    top: 16,
-                    bottom: 16,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        _ActionIcon(icon: Icons.favorite_border),
-                        SizedBox(height: 18),
-                        _ActionIcon(icon: Icons.chat_bubble_outline),
-                        SizedBox(height: 18),
-                        _ActionIcon(icon: Icons.bookmark_border),
-                        SizedBox(height: 18),
-                        _ActionIcon(icon: Icons.send_outlined),
-                      ],
-                    ),
-                  ),
-                  // Bottom meta
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 56),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('<Post Title>', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 6),
-                          const Text(
-                            '<Post Caption>. Lorem Ipsum is simply dummy text of the printing and typesetting industry...',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: -6,
-                            children: const [
-                              _TagChip('#Post Tag1'),
-                              _TagChip('#Post Tag2'),
-                              _TagChip('#Post Tag3'),
-                              _TagChip('#Post Tag4'),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Failed to load articles', style: const TextStyle(color: Colors.white70)),
+                              const SizedBox(height: 8),
+                              Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                              const SizedBox(height: 12),
+                              ElevatedButton(onPressed: _fetch, child: const Text('Retry')),
                             ],
-                          )
-                        ],
-                      ),
-                    ),
-                  )
-                ],
-              ),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _articles.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 24),
+                          padding: const EdgeInsets.only(bottom: 32, top: 8),
+                          itemBuilder: (context, i) {
+                            final a = _articles[i];
+                            return _ArticleCard(article: a);
+                          },
+                        ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ArticleCard extends StatelessWidget {
+  final ArticleModel article;
+  const _ArticleCard({required this.article});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 20, 72, 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24, width: 0.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                article.title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              if (article.content != null)
+                Text(
+                  article.content!.length > 180
+                      ? article.content!.substring(0, 180) + '…'
+                      : article.content!,
+                  style: const TextStyle(color: Colors.white70, height: 1.3),
+                ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                  if (article.createdAt != null)
+                    _MetaIcon(icon: Icons.access_time, label: _timeAgo(article.createdAt!)),
+                ],
+              )
+            ],
+          ),
+        ),
+        Positioned(
+          right: 8,
+          top: 0,
+          bottom: 0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              _ActionIcon(icon: Icons.favorite_border),
+              SizedBox(height: 18),
+              _ActionIcon(icon: Icons.chat_bubble_outline),
+              SizedBox(height: 18),
+              _ActionIcon(icon: Icons.bookmark_border),
+              SizedBox(height: 18),
+              _ActionIcon(icon: Icons.send_outlined),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    return '${diff.inDays}d';
+  }
+}
+
+class _MetaIcon extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MetaIcon({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: Colors.white54),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white54)),
+      ],
     );
   }
 }
@@ -196,15 +283,7 @@ class _ActionIcon extends StatelessWidget {
   }
 }
 
-class _TagChip extends StatelessWidget {
-  final String text;
-  const _TagChip(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, style: const TextStyle(color: Colors.white54, fontStyle: FontStyle.italic));
-  }
-}
+// _TagChip removed (unused after integrating real feed)
 
 class _NotificationsPage extends StatelessWidget {
   const _NotificationsPage();
