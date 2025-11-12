@@ -33,6 +33,9 @@ class ApiClient {
     await prefs.remove('authToken');
   }
 
+  // Expose current token for read-only access
+  String? get token => _token;
+
   Map<String, String> _headers({Map<String, String>? extra}) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
