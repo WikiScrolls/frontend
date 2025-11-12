@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/env.dart';
 
@@ -44,11 +45,14 @@ class ApiClient {
   }
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
-    // Ensure no double slashes when joining baseUrl and path
-    final normalized = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    // If web proxy flag is on, swap baseUrl to proxy (still keep original for logs if needed)
+  final effectiveBase = (Env.useCorsProxy && kIsWeb) ? Env.corsProxy : baseUrl;
+    final normalized = effectiveBase.endsWith('/') ? effectiveBase.substring(0, effectiveBase.length - 1) : effectiveBase;
     final joined = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$normalized$joined').replace(queryParameters: query?.map((k, v) => MapEntry(k, '$v')));
   }
+
+  // no extra helpers
 
   Future<http.Response> get(String path, {Map<String, dynamic>? query}) async {
     final res = await http.get(_uri(path, query), headers: _headers());
