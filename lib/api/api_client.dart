@@ -44,7 +44,10 @@ class ApiClient {
   }
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
-    return Uri.parse('$baseUrl$path').replace(queryParameters: query?.map((k, v) => MapEntry(k, '$v')));
+    // Ensure no double slashes when joining baseUrl and path
+    final normalized = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final joined = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$normalized$joined').replace(queryParameters: query?.map((k, v) => MapEntry(k, '$v')));
   }
 
   Future<http.Response> get(String path, {Map<String, dynamic>? query}) async {
