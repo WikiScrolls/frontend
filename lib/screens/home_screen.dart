@@ -53,7 +53,10 @@ class _FeedPage extends StatefulWidget {
 class _FeedPageState extends State<_FeedPage> {
   final _service = ArticleService();
   List<ArticleModel> _articles = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _end = false;
+  int _page = 1;
+  final int _limit = 5;
   String? _error;
 
   @override
@@ -62,40 +65,102 @@ class _FeedPageState extends State<_FeedPage> {
     _fetch();
   }
 
+  Future<void> _preloadImages(List<ArticleModel> articles) async {
+  for (final a in articles) {
+        final img = Image.network(
+        "https://picsum.photos/seed/${a.title.hashCode}/900/1600",
+        );
+
+        await precacheImage(img.image, context);
+    }
+    }
+
+
   Future<void> _fetch() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_loading || _end) return;
+
+    setState(() => _loading = true);
+
     try {
-      final result = await _service.listArticles(page: 1, limit: 5);
-      setState(() {
-        _articles = result.$1;
-      });
+        final result = await _service.listArticles();
+        final newData = result.$1;
+
+        if (newData.isEmpty) {
+        _end = true;
+        } else {
+        _articles.addAll(newData);
+
+        // ---- PRELOAD IMAGES HERE ----
+        _preloadImages(newData);
+        }
     } catch (e) {
-      setState(() => _error = e.toString());
+        _error = e.toString();
     } finally {
-      if (mounted) setState(() => _loading = false);
+        if (mounted) setState(() => _loading = false);
+    }
+    }
+
+
+  void _loadMoreIfNeeded(int index) {
+    if (index >= _articles.length - 2 && !_loading && !_end) {
+      _fetch();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    if (_loading && _articles.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+
+    if (_error != null && _articles.isEmpty) {
+      return Center(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Search bar
-            Row(
-              children: [
-                Expanded(
+            const Text("Failed to load articles", style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: _fetch, child: const Text("Retry")),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        // FULL-SCREEN SWIPE FEED (TikTok style)
+        PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: _articles.length,
+          onPageChanged: _loadMoreIfNeeded,
+          itemBuilder: (context, i) {
+            return _FullScreenArticle(article: _articles[i]);
+          },
+        ),
+
+        // ----- OVERLAY UI (Search + Tabs) -----
+        Positioned(
+          top: 40,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: [
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: AbsorbPointer(
                   child: TextField(
                     readOnly: true,
                     decoration: InputDecoration(
-                      hintText: 'Search millions of topics...',
+                      filled: true,
+                      fillColor: Colors.white12,
+                      hintText: "Search millions of topics…",
+                      hintStyle: const TextStyle(color: Colors.white54),
                       prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
@@ -103,53 +168,132 @@ class _FeedPageState extends State<_FeedPage> {
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Tabs row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _TabChip(label: 'Friends'),
-                const SizedBox(width: 12),
-                _TabChip(label: 'Following'),
-                const SizedBox(width: 12),
-                const _TabChip(label: 'For You', selected: true),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('Failed to load articles', style: const TextStyle(color: Colors.white70)),
-                              const SizedBox(height: 8),
-                              Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                              const SizedBox(height: 12),
-                              ElevatedButton(onPressed: _fetch, child: const Text('Retry')),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: _articles.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 24),
-                          padding: const EdgeInsets.only(bottom: 32, top: 8),
-                          itemBuilder: (context, i) {
-                            final a = _articles[i];
-                            return _ArticleCard(article: a);
-                          },
-                        ),
-            ),
-          ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Tabs
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  _TabChip(label: "Friends"),
+                  SizedBox(width: 12),
+                  _TabChip(label: "Following"),
+                  SizedBox(width: 12),
+                  _TabChip(label: "For You", selected: true),
+                ],
+              )
+            ],
+          ),
         ),
+      ],
+    );
+  }
+}
+
+class _FullScreenArticle extends StatelessWidget {
+  final ArticleModel article;
+  const _FullScreenArticle({required this.article});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl =
+        "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
+
+    return Container(
+      color: Colors.black,
+      width: double.infinity,
+      height: double.infinity,
+      child: Stack(
+        children: [
+          // ---- FULL SCREEN IMAGE ----
+          Positioned.fill(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          // ---- DARK OVERLAY FOR READABILITY ----
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.55),
+            ),
+          ),
+
+          // ---- TEXT + ACTIONS ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 120, 20, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(
+                  article.title,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Content
+                Text(
+                  article.content ?? "",
+                  maxLines: 14,
+                  overflow: TextOverflow.fade,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    height: 1.4,
+                    fontSize: 17,
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Bottom metadata + buttons
+                Row(
+                  children: [
+                    _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                    const SizedBox(width: 12),
+                    if (article.createdAt != null)
+                      _MetaIcon(
+                        icon: Icons.access_time,
+                        label: _timeAgo(article.createdAt!),
+                      ),
+                    const Spacer(),
+                    IconButton(
+                        icon: const Icon(Icons.favorite_border, color: Colors.white),
+                        onPressed: () {}),
+                    IconButton(
+                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                        onPressed: () {}),
+                    IconButton(
+                        icon: const Icon(Icons.bookmark_border, color: Colors.white),
+                        onPressed: () {}),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+
+// Shared utilities
+String _timeAgo(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+  if (diff.inHours < 24) return '${diff.inHours}h';
+  return '${diff.inDays}d';
+}
+
 
 class _ArticleCard extends StatelessWidget {
   final ArticleModel article;
@@ -157,6 +301,9 @@ class _ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final randomImageUrl =
+        "https://picsum.photos/seed/${article.id ?? article.title.hashCode}/500/300";
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
@@ -174,6 +321,18 @@ class _ArticleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- NEW IMAGE HERE ---
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.network(
+                        randomImageUrl,
+                        height: 160,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     Text(
                       article.title,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -182,29 +341,42 @@ class _ArticleCard extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 8),
+
                     if (article.content != null)
                       Text(
                         article.content!.length > 180
                             ? article.content!.substring(0, 180) + '…'
                             : article.content!,
-                        style: const TextStyle(color: Colors.white70, height: 1.4, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.4,
+                          fontSize: 14,
+                        ),
                       ),
                     const SizedBox(height: 12),
+
                     Wrap(
                       spacing: 12,
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                        _MetaIcon(
+                          icon: Icons.favorite,
+                          label: article.likeCount.toString(),
+                        ),
                         if (article.createdAt != null)
-                          _MetaIcon(icon: Icons.access_time, label: _timeAgo(article.createdAt!)),
+                          _MetaIcon(
+                            icon: Icons.access_time,
+                            label: _timeAgo(article.createdAt!),
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
-            // Action icons
+
+            // Actions
             Container(
               width: 56,
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -235,6 +407,7 @@ class _ArticleCard extends StatelessWidget {
     return '${diff.inDays}d';
   }
 }
+
 
 class _MetaIcon extends StatelessWidget {
   final IconData icon;
