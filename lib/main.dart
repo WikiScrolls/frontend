@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_colors.dart';
+import 'state/auth_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const WikiScrollsApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthState()..loadToken(),
+      child: const WikiScrollsApp(),
+    ),
+  );
 }
 
 class WikiScrollsApp extends StatelessWidget {

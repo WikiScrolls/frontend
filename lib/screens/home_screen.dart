@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import '../state/user_profile.dart';
 import '../api/article_service.dart';
 import '../api/models/article.dart';
+import 'profile_page.dart';
+import 'settings_page.dart';
+import 'notifications_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,9 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final pages = [
       const _FeedPage(),
-      const _NotificationsPage(),
-      ProfilePage(profile: UserProfile.instance),
-      const _SettingsPage(),
+      const NotificationsPage(),
+      const ProfilePage(),
+      const SettingsPage(),
     ];
 
     return Scaffold(
@@ -284,189 +286,5 @@ class _ActionIcon extends StatelessWidget {
 }
 
 // _TagChip removed (unused after integrating real feed)
+// Old stub pages (_NotificationsPage, old ProfilePage, _SettingsPage, _SimpleScaffold) removed; using standalone pages now
 
-class _NotificationsPage extends StatelessWidget {
-  const _NotificationsPage();
-  @override
-  Widget build(BuildContext context) {
-    return const _SimpleScaffold(title: 'Notifications');
-  }
-}
-
-class ProfilePage extends StatefulWidget {
-  final UserProfile profile;
-  const ProfilePage({super.key, required this.profile});
-
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  late TextEditingController _username;
-  late TextEditingController _pass1;
-  late TextEditingController _pass2;
-  bool _obscure1 = true;
-  bool _obscure2 = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _username = TextEditingController(text: widget.profile.username);
-    _pass1 = TextEditingController();
-    _pass2 = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _pass1.dispose();
-    _pass2.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (_pass1.text != _pass2.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
-      return;
-    }
-    setState(() {
-      widget.profile.username = _username.text.trim();
-      if (_pass1.text.isNotEmpty) {
-        widget.profile.password = _pass1.text; // In real app: hash & send to API
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Edit Profile',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.lightBrown,
-                      fontWeight: FontWeight.w700,
-                    )),
-            const SizedBox(height: 20),
-            Center(
-              child: GestureDetector(
-                onTap: () async {
-                  // Placeholder for image picker integration
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Image picker not implemented yet.')),
-                  );
-                },
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: Colors.white.withOpacity(0.1),
-                  child: const Icon(Icons.person, size: 48, color: Colors.white70),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _fieldLabel('Username'),
-            TextField(
-              controller: _username,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline)),
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            _fieldLabel('New Password'),
-            TextField(
-              controller: _pass1,
-              obscureText: _obscure1,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(_obscure1 ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscure1 = !_obscure1),
-                ),
-              ),
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            _fieldLabel('Confirm Password'),
-            TextField(
-              controller: _pass2,
-              obscureText: _obscure2,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(_obscure2 ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _obscure2 = !_obscure2),
-                ),
-              ),
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-                onPressed: _save,
-                child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _fieldLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-      );
-}
-
-class _SettingsPage extends StatelessWidget {
-  const _SettingsPage();
-  @override
-  Widget build(BuildContext context) {
-    return const _SimpleScaffold(title: 'Settings');
-  }
-}
-
-class _SimpleScaffold extends StatelessWidget {
-  final String title;
-  const _SimpleScaffold({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              title == 'Notifications'
-                  ? Icons.notifications
-                  : title == 'Profile'
-                      ? Icons.person
-                      : Icons.settings,
-              size: 72,
-              color: AppColors.lightBrown,
-            ),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('This page is coming soon.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70)),
-          ],
-        ),
-      ),
-    );
-  }
-}

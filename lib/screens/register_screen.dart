@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_button.dart';
 import 'login_screen.dart';
 import '../api/auth_service.dart';
+import '../api/models/user.dart';
 import '../state/user_profile.dart';
+import '../state/auth_state.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -122,8 +125,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   email: _email.text.trim(),
                                   password: _password.text,
                                 );
-                                final user = res.$2;
-                                UserProfile.instance.username = (user['username'] ?? _username.text.trim()).toString();
+                                final token = res.$1;
+                                final userJson = res.$2;
+                                final user = UserModel.fromJson(userJson);
+                                if (!mounted) return;
+                                await context.read<AuthState>().setSession(token: token, user: user);
+                                UserProfile.instance.username = user.username;
                                 if (!mounted) return;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
