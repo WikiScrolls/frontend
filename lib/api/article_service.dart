@@ -16,11 +16,8 @@ class ArticleService {
     if (res.statusCode == 200 && data['success'] == true) {
       final rawArticles = (data['data']['articles'] as List);
       final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
-      PaginationInfo? pagination;
-      if (data['data']['pagination'] is Map<String, dynamic>) {
-        pagination = PaginationInfo.fromJson(data['data']['pagination']);
-      }
-      return (articles, pagination);
+
+      return (articles, null);
     }
     throw Exception(data['message'] ?? 'Failed to fetch articles');
   }
