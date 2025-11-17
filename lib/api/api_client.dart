@@ -149,6 +149,7 @@ class ApiClient {
     );
   }
 
+
   Future<http.Response> post(String path, {Object? body, Map<String, dynamic>? query}) async {
     return _handleRequest(
       () => _httpClient.post(_uri(path, query), headers: _headers(), body: jsonEncode(body)),

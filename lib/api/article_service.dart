@@ -8,13 +8,11 @@ class ArticleService {
   ArticleService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
   Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({int page = 1, int limit = 10, String sortBy = 'likeCount', String sortOrder = 'desc'}) async {
-    final http.Response res = await _client.get('/api/articles', query: {
-      'page': page,
-      'limit': limit,
-      'sortBy': sortBy,
-      'sortOrder': sortOrder,
-    });
-    final data = _client.decode(res);
+    final local = ApiClient(baseUrl: "http://localhost:8080");
+    final http.Response res = await local.get(
+      '/recommendations',
+    );
+    final data = local.decode(res);
     if (res.statusCode == 200 && data['success'] == true) {
       final rawArticles = (data['data']['articles'] as List);
       final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
