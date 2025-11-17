@@ -2,10 +2,11 @@
     <!-- Ensure Internet permission also present in release builds -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="wikiscrolls_frontend"
+        android:label="wikiscrolls"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

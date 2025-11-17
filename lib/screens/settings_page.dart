@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../state/auth_state.dart';
 import 'onboarding_screen.dart';
+import 'account_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -24,7 +25,11 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.person,
             title: 'Account',
             subtitle: authState.user?.email ?? 'Not logged in',
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
+              );
+            },
           ),
           const Divider(color: Colors.white24),
           _SettingTile(

@@ -108,6 +108,7 @@ class _FeedPageState extends State<_FeedPage> {
             const SizedBox(height: 10),
             // Tabs row
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _TabChip(label: 'Friends'),
                 const SizedBox(width: 12),
@@ -156,65 +157,73 @@ class _ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 20, 72, 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white24, width: 0.5),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                article.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white24, width: 0.5),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Main content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      article.title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
-              ),
-              const SizedBox(height: 8),
-              if (article.content != null)
-                Text(
-                  article.content!.length > 180
-                      ? article.content!.substring(0, 180) + '…'
-                      : article.content!,
-                  style: const TextStyle(color: Colors.white70, height: 1.3),
+                    const SizedBox(height: 8),
+                    if (article.content != null)
+                      Text(
+                        article.content!.length > 180
+                            ? article.content!.substring(0, 180) + '…'
+                            : article.content!,
+                        style: const TextStyle(color: Colors.white70, height: 1.4, fontSize: 14),
+                      ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                        if (article.createdAt != null)
+                          _MetaIcon(icon: Icons.access_time, label: _timeAgo(article.createdAt!)),
+                      ],
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
-                  if (article.createdAt != null)
-                    _MetaIcon(icon: Icons.access_time, label: _timeAgo(article.createdAt!)),
+              ),
+            ),
+            // Action icons
+            Container(
+              width: 56,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  _ActionIcon(icon: Icons.favorite_border),
+                  SizedBox(height: 12),
+                  _ActionIcon(icon: Icons.chat_bubble_outline),
+                  SizedBox(height: 12),
+                  _ActionIcon(icon: Icons.bookmark_border),
+                  SizedBox(height: 12),
+                  _ActionIcon(icon: Icons.send_outlined),
                 ],
-              )
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
-        Positioned(
-          right: 8,
-          top: 0,
-          bottom: 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              _ActionIcon(icon: Icons.favorite_border),
-              SizedBox(height: 18),
-              _ActionIcon(icon: Icons.chat_bubble_outline),
-              SizedBox(height: 18),
-              _ActionIcon(icon: Icons.bookmark_border),
-              SizedBox(height: 18),
-              _ActionIcon(icon: Icons.send_outlined),
-            ],
-          ),
-        )
-      ],
+      ),
     );
   }
 

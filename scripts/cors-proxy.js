@@ -44,6 +44,10 @@ const server = http.createServer((req, res) => {
   const headers = { ...req.headers };
   // Host header should match target
   headers.host = targetUrl.host;
+  // Remove origin header to avoid CORS issues on target server
+  // Backend will treat this as a non-browser request (like mobile app)
+  delete headers.origin;
+  delete headers.referer;
 
   const opts = {
     protocol: targetUrl.protocol,

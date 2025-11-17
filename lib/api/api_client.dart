@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/env.dart';
@@ -11,18 +12,42 @@ class ApiClient {
 
   String baseUrl;
   String? _token;
+  late http.Client _httpClient;
   
   // HTTP timeout duration
   static const Duration _timeout = Duration(seconds: 30);
 
   ApiClient({String? baseUrl, String? token}) : baseUrl = baseUrl ?? defaultBaseUrl {
     _token = token;
+    _httpClient = _createHttpClient();
     if (kDebugMode) {
       print('[ApiClient] Initialized with baseUrl: $baseUrl');
     }
   }
 
   static final ApiClient instance = ApiClient();
+
+  // Create HTTP client with custom certificate handling for development
+  http.Client _createHttpClient() {
+    if (kIsWeb) {
+      return http.Client();
+    }
+    
+    final ioClient = HttpClient();
+    
+    // In development mode, allow self-signed certificates
+    // This helps with Android emulator SSL issues
+    if (kDebugMode) {
+      ioClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
+        if (kDebugMode) {
+          print('[ApiClient] Accepting certificate for $host:$port');
+        }
+        return true; // Accept all certificates in debug mode
+      };
+    }
+    
+    return IOClient(ioClient);
+  }
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -67,11 +92,12 @@ class ApiClient {
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     // If web proxy flag is on, swap baseUrl to proxy (still keep original for logs if needed)
-  final effectiveBase = (Env.useCorsProxy && kIsWeb) ? Env.corsProxy : baseUrl;
+    final effectiveBase = (Env.useCorsProxy && kIsWeb) ? Env.corsProxy : baseUrl;
     final normalized = effectiveBase.endsWith('/') ? effectiveBase.substring(0, effectiveBase.length - 1) : effectiveBase;
     final joined = path.startsWith('/') ? path : '/$path';
     final uri = Uri.parse('$normalized$joined').replace(queryParameters: query?.map((k, v) => MapEntry(k, '$v')));
     if (kDebugMode) {
+      print('[ApiClient] useCorsProxy: ${Env.useCorsProxy}, kIsWeb: $kIsWeb, effectiveBase: $effectiveBase');
       print('[ApiClient] Request URI: $uri');
     }
     return uri;
@@ -117,7 +143,7 @@ class ApiClient {
 
   Future<http.Response> get(String path, {Map<String, dynamic>? query}) async {
     return _handleRequest(
-      () => http.get(_uri(path, query), headers: _headers()),
+      () => _httpClient.get(_uri(path, query), headers: _headers()),
       'GET',
       path,
     );
@@ -125,7 +151,7 @@ class ApiClient {
 
   Future<http.Response> post(String path, {Object? body, Map<String, dynamic>? query}) async {
     return _handleRequest(
-      () => http.post(_uri(path, query), headers: _headers(), body: jsonEncode(body)),
+      () => _httpClient.post(_uri(path, query), headers: _headers(), body: jsonEncode(body)),
       'POST',
       path,
     );
@@ -133,7 +159,7 @@ class ApiClient {
 
   Future<http.Response> put(String path, {Object? body}) async {
     return _handleRequest(
-      () => http.put(_uri(path), headers: _headers(), body: jsonEncode(body)),
+      () => _httpClient.put(_uri(path), headers: _headers(), body: jsonEncode(body)),
       'PUT',
       path,
     );
@@ -141,7 +167,7 @@ class ApiClient {
 
   Future<http.Response> delete(String path, {Object? body}) async {
     return _handleRequest(
-      () => http.delete(_uri(path), headers: _headers(), body: body == null ? null : jsonEncode(body)),
+      () => _httpClient.delete(_uri(path), headers: _headers(), body: body == null ? null : jsonEncode(body)),
       'DELETE',
       path,
     );
