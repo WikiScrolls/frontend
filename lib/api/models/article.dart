@@ -2,6 +2,7 @@ class ArticleModel {
   final String id;
   final String title;
   final String? content;
+  final String? thumbnail;
   final int likeCount;
   final DateTime? createdAt;
 
@@ -9,6 +10,7 @@ class ArticleModel {
     required this.id,
     required this.title,
     this.content,
+    this.thumbnail,
     this.likeCount = 0,
     this.createdAt,
   });
@@ -21,6 +23,7 @@ class ArticleModel {
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt'].toString())
             : null,
+        thumbnail: json['thumbnail'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +31,7 @@ class ArticleModel {
         'title': title,
         'content': content,
         'likeCount': likeCount,
+        'thumbnail': thumbnail,
         'createdAt': createdAt?.toIso8601String(),
       };
 }

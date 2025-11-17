@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
@@ -33,10 +35,22 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.notifications_none), selectedIcon: Icon(Icons.notifications), label: 'Notifications'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home'),
+          NavigationDestination(
+              icon: Icon(Icons.notifications_none),
+              selectedIcon: Icon(Icons.notifications),
+              label: 'Notifications'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile'),
+          NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Settings'),
         ],
       ),
     );
@@ -66,15 +80,14 @@ class _FeedPageState extends State<_FeedPage> {
   }
 
   Future<void> _preloadImages(List<ArticleModel> articles) async {
-  for (final a in articles) {
-        final img = Image.network(
-        "https://picsum.photos/seed/${a.title.hashCode}/900/1600",
-        );
+    for (final a in articles) {
+      final img = Image.network(a.thumbnail?.isNotEmpty == true
+          ? a.thumbnail!
+          : "https://picsum.photos/seed/${a.id}/900/1600");
 
-        await precacheImage(img.image, context);
+      await precacheImage(img.image, context);
     }
-    }
-
+  }
 
   Future<void> _fetch() async {
     if (_loading || _end) return;
@@ -82,24 +95,23 @@ class _FeedPageState extends State<_FeedPage> {
     setState(() => _loading = true);
 
     try {
-        final result = await _service.listArticles();
-        final newData = result.$1;
+      final result = await _service.listArticles();
+      final newData = result.$1;
 
-        if (newData.isEmpty) {
+      if (newData.isEmpty) {
         _end = true;
-        } else {
+      } else {
         _articles.addAll(newData);
 
         // ---- PRELOAD IMAGES HERE ----
         _preloadImages(newData);
-        }
+      }
     } catch (e) {
-        _error = e.toString();
+      _error = e.toString();
     } finally {
-        if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
-    }
-
+  }
 
   void _loadMoreIfNeeded(int index) {
     if (index >= _articles.length - 2 && !_loading && !_end) {
@@ -120,7 +132,8 @@ class _FeedPageState extends State<_FeedPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Failed to load articles", style: TextStyle(color: Colors.white70)),
+            const Text("Failed to load articles",
+                style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 8),
             Text(_error!, style: const TextStyle(color: Colors.redAccent)),
             const SizedBox(height: 12),
@@ -160,7 +173,8 @@ class _FeedPageState extends State<_FeedPage> {
                       fillColor: Colors.white12,
                       hintText: "Search millions of topics…",
                       hintStyle: const TextStyle(color: Colors.white54),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                      prefixIcon:
+                          const Icon(Icons.search, color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
@@ -197,8 +211,9 @@ class _FullScreenArticle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl =
-        "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
+    final imageUrl = article.thumbnail?.isNotEmpty == true
+        ? article.thumbnail!
+        : "https://picsum.photos/seed/${article.id}/900/1600";
 
     return Container(
       color: Colors.black,
@@ -224,66 +239,53 @@ class _FullScreenArticle extends StatelessWidget {
           // ---- TEXT + ACTIONS ----
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 120, 20, 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                Text(
-                  article.title,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3), // a bit of tint
                   ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Content
-                Text(
-                  article.content ?? "",
-                  maxLines: 14,
-                  overflow: TextOverflow.fade,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    height: 1.4,
-                    fontSize: 17,
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Bottom metadata + buttons
-                Row(
-                  children: [
-                    _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
-                    const SizedBox(width: 12),
-                    if (article.createdAt != null)
-                      _MetaIcon(
-                        icon: Icons.access_time,
-                        label: _timeAgo(article.createdAt!),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        article.title,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
                       ),
-                    const Spacer(),
-                    IconButton(
-                        icon: const Icon(Icons.favorite_border, color: Colors.white),
-                        onPressed: () {}),
-                    IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                        onPressed: () {}),
-                    IconButton(
-                        icon: const Icon(Icons.bookmark_border, color: Colors.white),
-                        onPressed: () {}),
-                  ],
+
+                      const SizedBox(height: 16),
+
+                      // Content
+                      Text(
+                        article.content ?? "",
+                        maxLines: 14,
+                        overflow: TextOverflow.fade,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.4,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
+          )
         ],
       ),
     );
   }
 }
-
 
 // Shared utilities
 String _timeAgo(DateTime dt) {
@@ -294,15 +296,15 @@ String _timeAgo(DateTime dt) {
   return '${diff.inDays}d';
 }
 
-
 class _ArticleCard extends StatelessWidget {
   final ArticleModel article;
   const _ArticleCard({required this.article});
 
   @override
   Widget build(BuildContext context) {
-    final randomImageUrl =
-        "https://picsum.photos/seed/${article.id ?? article.title.hashCode}/500/300";
+    final imageUrl = article.thumbnail?.isNotEmpty == true
+        ? article.thumbnail!
+        : "https://picsum.photos/seed/${article.id}/900/1600";
 
     return Container(
       decoration: BoxDecoration(
@@ -325,7 +327,7 @@ class _ArticleCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
                       child: Image.network(
-                        randomImageUrl,
+                        imageUrl,
                         height: 160,
                         width: double.infinity,
                         fit: BoxFit.cover,
@@ -408,7 +410,6 @@ class _ArticleCard extends StatelessWidget {
   }
 }
 
-
 class _MetaIcon extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -469,4 +470,3 @@ class _ActionIcon extends StatelessWidget {
 
 // _TagChip removed (unused after integrating real feed)
 // Old stub pages (_NotificationsPage, old ProfilePage, _SettingsPage, _SimpleScaffold) removed; using standalone pages now
-
