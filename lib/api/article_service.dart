@@ -8,18 +8,18 @@ class ArticleService {
   ArticleService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
   Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({int page = 1, int limit = 10, String sortBy = 'likeCount', String sortOrder = 'desc'}) async {
-    final local = ApiClient(baseUrl: "http://localhost:8080");
+    final local = ApiClient(baseUrl: "https://mf_recommender.digilabdte.com");
     final http.Response res = await local.get(
-      '/recommendations',
+      'api/recommendation/random',
     );
     final data = local.decode(res);
-    if (res.statusCode == 200 && data['success'] == true) {
-      final rawArticles = (data['data']['articles'] as List);
+    if (res.statusCode == 200) {
+      final rawArticles = (data['data'] as List);
       final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
 
       return (articles, null);
     }
-    throw Exception(data['message'] ?? 'Failed to fetch articles');
+    throw Exception(data['error'] ?? 'Failed to fetch articles');
   }
 
   // POST /api/articles/:id/view to record a view
