@@ -8,7 +8,7 @@ class ArticleService {
   ArticleService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
   Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({int page = 1, int limit = 10, String sortBy = 'likeCount', String sortOrder = 'desc'}) async {
-    final local = ApiClient(baseUrl: "https://mf_recommender.digilabdte.com");
+    final local = ApiClient(baseUrl: "http://mf_recommender.digilabdte.com");
     final http.Response res = await local.get(
       'api/recommendation/random',
     );
