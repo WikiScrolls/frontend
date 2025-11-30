@@ -4,8 +4,23 @@ import 'package:provider/provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'theme/app_colors.dart';
 import 'state/auth_state.dart';
+import 'dart:io';
+
+// Source - https://stackoverflow.com/a
+// Posted by Ma'moon Al-Akash, modified by community. See post 'Timeline' for change history
+// Retrieved 2025-11-30, License - CC BY-SA 4.0
+
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context){
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port)=> true;
+  }
+}
+
 
 void main() async {
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     ChangeNotifierProvider(
