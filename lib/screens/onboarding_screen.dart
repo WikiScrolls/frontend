@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:provider/provider.dart';
 import '../widgets/onboarding_page.dart';
 import '../widgets/primary_button.dart';
+import '../state/auth_state.dart';
 import 'register_screen.dart';
+import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -13,6 +16,25 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthentication();
+  }
+
+  void _checkAuthentication() {
+    // Wait for auth state to finish loading
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthState>();
+      if (!authState.isLoading && authState.isAuthenticated) {
+        // User is already logged in, go to home
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    });
+  }
 
   void _goToHome() {
     Navigator.of(context).pushReplacement(

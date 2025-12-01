@@ -2,33 +2,56 @@ import 'api_client.dart';
 import 'models/article.dart';
 import 'models/pagination.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class ArticleService {
   final ApiClient _client;
+  
   ArticleService({ApiClient? client}) : _client = client ?? ApiClient.instance;
 
   Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({int page = 1, int limit = 10, String sortBy = 'likeCount', String sortOrder = 'desc'}) async {
-    final local = ApiClient(baseUrl: "http://mf_recommender.digilabdte.com");
-    final http.Response res = await local.get(
-      'api/recommendation/random',
+    final http.Response res = await _client.get(
+      '/api/articles',
+      query: {
+        'page': page,
+        'limit': limit,
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+      },
     );
-    final data = local.decode(res);
-    if (res.statusCode == 200) {
-      final rawArticles = (data['data'] as List);
+    final data = _client.decode(res);
+    if (res.statusCode == 200 && data['success'] == true) {
+      // Backend returns { success: true, data: { articles: [...], pagination: {...} } }
+      final responseData = data['data'] as Map<String, dynamic>;
+      final rawArticles = (responseData['articles'] as List);
       final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
-
+      if (kDebugMode) {
+        print('[ArticleService] Successfully loaded ${articles.length} articles');
+      }
       return (articles, null);
     }
-    throw Exception(data['error'] ?? 'Failed to fetch articles');
+    throw Exception(data['message'] ?? 'Failed to fetch articles');
   }
 
   // POST /api/articles/:id/view to record a view
   Future<bool> recordView(String articleId) async {
-    final res = await _client.post('/api/articles/$articleId/view');
-    final data = _client.decode(res);
-    if (res.statusCode >= 200 && res.statusCode < 300 && data['success'] == true) {
-      return true;
+    try {
+      final res = await _client.post('/api/articles/$articleId/view');
+      final data = _client.decode(res);
+      if (res.statusCode >= 200 && res.statusCode < 300 && data['success'] == true) {
+        return true;
+      }
+      throw Exception(data['message'] ?? 'Failed to record view');
+    } catch (e) {
+      if (kDebugMode) {
+        print('[ArticleService] Failed to record view: $e');
+      }
+      return false;
     }
-    throw Exception(data['message'] ?? 'Failed to record view');
+  }
+
+  // Retry loading real articles
+  Future<(List<ArticleModel> articles, PaginationInfo? pagination)> retryLoadArticles({int page = 1, int limit = 10}) async {
+    return listArticles(page: page, limit: limit);
   }
 }

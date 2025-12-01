@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
 import '../api/models/article.dart';
+import '../api/interaction_service.dart';
+import '../widgets/send_article_dialog.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
+import 'search_screen.dart';
+import 'friends_list_screen.dart';
+import 'following_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,8 +60,6 @@ class _FeedPageState extends State<_FeedPage> {
   List<ArticleModel> _articles = [];
   bool _loading = false;
   bool _end = false;
-  int _page = 1;
-  final int _limit = 5;
   String? _error;
 
   @override
@@ -76,10 +79,17 @@ class _FeedPageState extends State<_FeedPage> {
     }
 
 
-  Future<void> _fetch() async {
-    if (_loading || _end) return;
+  Future<void> _fetch({bool refresh = false}) async {
+    if (_loading || (_end && !refresh)) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      if (refresh) {
+        _articles.clear();
+        _end = false;
+        _error = null;
+      }
+    });
 
     try {
         final result = await _service.listArticles();
@@ -105,6 +115,10 @@ class _FeedPageState extends State<_FeedPage> {
     if (index >= _articles.length - 2 && !_loading && !_end) {
       _fetch();
     }
+  }
+
+  Future<void> _refreshArticles() async {
+    await _fetch(refresh: true);
   }
 
   @override
@@ -152,18 +166,26 @@ class _FeedPageState extends State<_FeedPage> {
               // Search bar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: AbsorbPointer(
-                  child: TextField(
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white12,
-                      hintText: "Search millions of topics…",
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SearchScreen()),
+                    );
+                  },
+                  child: AbsorbPointer(
+                    child: TextField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white12,
+                        hintText: "Search millions of topics…",
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
@@ -175,15 +197,52 @@ class _FeedPageState extends State<_FeedPage> {
               // Tabs
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _TabChip(label: "Friends"),
-                  SizedBox(width: 12),
-                  _TabChip(label: "Following"),
-                  SizedBox(width: 12),
-                  _TabChip(label: "For You", selected: true),
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FriendsListScreen()),
+                      );
+                    },
+                    child: const _TabChip(label: "Friends"),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FollowingListScreen()),
+                      );
+                    },
+                    child: const _TabChip(label: "Following"),
+                  ),
+                  const SizedBox(width: 12),
+                  const _TabChip(label: "For You", selected: true),
                 ],
               )
             ],
+          ),
+        ),
+
+        // ----- FLOATING REFRESH BUTTON -----
+        Positioned(
+          bottom: 80,
+          right: 16,
+          child: FloatingActionButton(
+            mini: true,
+            backgroundColor: Colors.white24,
+            onPressed: _refreshArticles,
+            child: _loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white),
           ),
         ),
       ],
@@ -191,14 +250,95 @@ class _FeedPageState extends State<_FeedPage> {
   }
 }
 
-class _FullScreenArticle extends StatelessWidget {
+class _FullScreenArticle extends StatefulWidget {
   final ArticleModel article;
   const _FullScreenArticle({required this.article});
 
   @override
+  State<_FullScreenArticle> createState() => _FullScreenArticleState();
+}
+
+class _FullScreenArticleState extends State<_FullScreenArticle> {
+  final _interactionService = InteractionService();
+  bool _isLiked = false;
+  bool _isSaved = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInteractions();
+  }
+
+  Future<void> _checkInteractions() async {
+    try {
+      final liked = await _interactionService.hasInteraction(widget.article.id, type: 'LIKE');
+      final saved = await _interactionService.hasInteraction(widget.article.id, type: 'SAVE');
+      if (mounted) {
+        setState(() {
+          _isLiked = liked;
+          _isSaved = saved;
+        });
+      }
+    } catch (e) {
+      // Silently fail - user might not be logged in
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    
+    try {
+      final newState = await _interactionService.toggleLike(widget.article.id, _isLiked);
+      if (mounted) {
+        setState(() {
+          _isLiked = newState;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to like: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    
+    try {
+      final newState = await _interactionService.toggleSave(widget.article.id, _isSaved);
+      if (mounted) {
+        setState(() {
+          _isSaved = newState;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    }
+  }
+
+  void _showComments() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Comments feature coming soon')),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final imageUrl =
-        "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
+        "https://picsum.photos/seed/${widget.article.title.hashCode}/900/1600";
 
     return Container(
       color: Colors.black,
@@ -229,7 +369,7 @@ class _FullScreenArticle extends StatelessWidget {
               children: [
                 // Title
                 Text(
-                  article.title,
+                  widget.article.title,
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
@@ -241,7 +381,7 @@ class _FullScreenArticle extends StatelessWidget {
 
                 // Content
                 Text(
-                  article.content ?? "",
+                  widget.article.content ?? "",
                   maxLines: 14,
                   overflow: TextOverflow.fade,
                   style: const TextStyle(
@@ -256,145 +396,35 @@ class _FullScreenArticle extends StatelessWidget {
                 // Bottom metadata + buttons
                 Row(
                   children: [
-                    _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                    _MetaIcon(icon: Icons.favorite, label: widget.article.likeCount.toString()),
                     const SizedBox(width: 12),
-                    if (article.createdAt != null)
+                    if (widget.article.createdAt != null)
                       _MetaIcon(
                         icon: Icons.access_time,
-                        label: _timeAgo(article.createdAt!),
+                        label: _timeAgo(widget.article.createdAt!),
                       ),
                     const Spacer(),
                     IconButton(
-                        icon: const Icon(Icons.favorite_border, color: Colors.white),
-                        onPressed: () {}),
+                        icon: Icon(
+                          _isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: _isLiked ? AppColors.orange : Colors.white,
+                        ),
+                        onPressed: _toggleLike),
                     IconButton(
                         icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                        onPressed: () {}),
+                        onPressed: _showComments),
                     IconButton(
-                        icon: const Icon(Icons.bookmark_border, color: Colors.white),
-                        onPressed: () {}),
+                        icon: Icon(
+                          _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: _isSaved ? AppColors.orange : Colors.white,
+                        ),
+                        onPressed: _toggleSave),
                   ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-
-// Shared utilities
-String _timeAgo(DateTime dt) {
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-  if (diff.inHours < 24) return '${diff.inHours}h';
-  return '${diff.inDays}d';
-}
-
-
-class _ArticleCard extends StatelessWidget {
-  final ArticleModel article;
-  const _ArticleCard({required this.article});
-
-  @override
-  Widget build(BuildContext context) {
-    final randomImageUrl =
-        "https://picsum.photos/seed/${article.id ?? article.title.hashCode}/500/300";
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white24, width: 0.5),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Main content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- NEW IMAGE HERE ---
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        randomImageUrl,
-                        height: 160,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Text(
-                      article.title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (article.content != null)
-                      Text(
-                        article.content!.length > 180
-                            ? article.content!.substring(0, 180) + '…'
-                            : article.content!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.4,
-                          fontSize: 14,
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _MetaIcon(
-                          icon: Icons.favorite,
-                          label: article.likeCount.toString(),
-                        ),
-                        if (article.createdAt != null)
-                          _MetaIcon(
-                            icon: Icons.access_time,
-                            label: _timeAgo(article.createdAt!),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Actions
-            Container(
-              width: 56,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _ActionIcon(icon: Icons.favorite_border),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.chat_bubble_outline),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.bookmark_border),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.send_outlined),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -407,7 +437,6 @@ class _ArticleCard extends StatelessWidget {
     return '${diff.inDays}d';
   }
 }
-
 
 class _MetaIcon extends StatelessWidget {
   final IconData icon;
@@ -446,27 +475,3 @@ class _TabChip extends StatelessWidget {
     );
   }
 }
-
-class _ActionIcon extends StatelessWidget {
-  final IconData icon;
-  const _ActionIcon({required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon),
-        color: Colors.white,
-        onPressed: () {},
-      ),
-    );
-  }
-}
-
-// _TagChip removed (unused after integrating real feed)
-// Old stub pages (_NotificationsPage, old ProfilePage, _SettingsPage, _SimpleScaffold) removed; using standalone pages now
-

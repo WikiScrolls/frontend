@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../state/auth_state.dart';
+import 'liked_articles_screen.dart';
+import 'saved_articles_screen.dart';
+import 'friends_list_screen.dart';
+import 'following_list_screen.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -61,14 +65,30 @@ class ProfilePage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _StatItem(count: '142', label: 'Friends'),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const FriendsListScreen()),
+                    );
+                  },
+                  child: _StatItem(count: '0', label: 'Friends'),
+                ),
                 Container(
                   width: 1,
                   height: 40,
                   margin: const EdgeInsets.symmetric(horizontal: 32),
                   color: Colors.white24,
                 ),
-                _StatItem(count: '1.2K', label: 'Followers'),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const FollowingListScreen()),
+                    );
+                  },
+                  child: _StatItem(count: '0', label: 'Followers'),
+                ),
               ],
             ),
             const SizedBox(height: 32),
@@ -77,7 +97,7 @@ class ProfilePage extends StatelessWidget {
             _ActivitySection(
               icon: Icons.comment_outlined,
               title: 'Past Comments',
-              count: '23',
+              count: '0',
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Comments feature coming soon')),
@@ -88,10 +108,11 @@ class ProfilePage extends StatelessWidget {
             _ActivitySection(
               icon: Icons.favorite_border,
               title: 'Past Likes',
-              count: '156',
+              count: '?',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Likes feature coming soon')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LikedArticlesScreen()),
                 );
               },
             ),
@@ -99,10 +120,11 @@ class ProfilePage extends StatelessWidget {
             _ActivitySection(
               icon: Icons.bookmark_border,
               title: 'Saved Posts',
-              count: '42',
+              count: '?',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Saved posts feature coming soon')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SavedArticlesScreen()),
                 );
               },
             ),
