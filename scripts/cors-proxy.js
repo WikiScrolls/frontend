@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  Simple CORS proxy for Flutter Web dev.
- - Proxies all requests to the configured TARGET (Railway backend)
+ - Proxies requests to multiple targets based on path
  - Adds permissive CORS headers for localhost origins
  - Handles OPTIONS preflight with 204
 
@@ -9,7 +9,8 @@ Usage:
   node scripts/cors-proxy.js [port]
 Defaults:
   port: 8787
-  target: https://backend-production-cc13.up.railway.app
+  Primary target: https://backend-production-cc13.up.railway.app
+  Gorse target: http://mf_recommender.digilabdte.com
 */
 
 const http = require('http');
@@ -17,8 +18,8 @@ const https = require('https');
 const { URL } = require('url');
 
 const PORT = Number(process.argv[2]) || 8787;
-const TARGET = process.env.TARGET || 'https://backend-production-cc13.up.railway.app';
-const targetUrl = new URL(TARGET);
+const BACKEND_TARGET = 'https://backend-production-cc13.up.railway.app';
+const GORSE_TARGET = 'http://mf_recommender.digilabdte.com';
 
 function setCors(res, origin) {
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
@@ -38,14 +39,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const path = req.url.startsWith('/') ? req.url : `/${req.url}`;
-  const outUrl = new URL(path, targetUrl);
+  // Determine target based on path
+  let targetUrl;
+  if (req.url.startsWith('/gorse/')) {
+    // Route /gorse/* to Gorse server
+    targetUrl = new URL(req.url.substring(6), GORSE_TARGET); // Remove /gorse prefix
+    console.log(`[Gorse] ${req.method} ${targetUrl.toString()}`);
+  } else {
+    // Route everything else to backend
+    targetUrl = new URL(req.url, BACKEND_TARGET);
+    console.log(`[Backend] ${req.method} ${targetUrl.toString()}`);
+  }
 
   const headers = { ...req.headers };
-  // Host header should match target
   headers.host = targetUrl.host;
-  // Remove origin header to avoid CORS issues on target server
-  // Backend will treat this as a non-browser request (like mobile app)
   delete headers.origin;
   delete headers.referer;
 
@@ -54,7 +61,7 @@ const server = http.createServer((req, res) => {
     hostname: targetUrl.hostname,
     port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
     method: req.method,
-    path: outUrl.pathname + (outUrl.search || ''),
+    path: targetUrl.pathname + (targetUrl.search || ''),
     headers,
   };
 
@@ -62,13 +69,14 @@ const server = http.createServer((req, res) => {
 
   const proxyReq = client.request(opts, (proxyRes) => {
     setCors(res, origin);
-    // Pipe status and headers
+    console.log(`[Response] ${proxyRes.statusCode} from ${targetUrl.host}`);
     res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
     proxyRes.pipe(res);
   });
 
   proxyReq.on('error', (err) => {
     setCors(res, origin);
+    console.error(`[Error] ${err.message} for ${targetUrl.toString()}`);
     res.statusCode = 502;
     res.end(`Proxy error: ${err.message}`);
   });
@@ -77,5 +85,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`CORS proxy listening on http://localhost:${PORT} -> ${TARGET}`);
+  console.log(`CORS proxy listening on http://localhost:${PORT}`);
+  console.log(`  - Backend: ${BACKEND_TARGET}`);
+  console.log(`  - Gorse: /gorse/* -> ${GORSE_TARGET}`);
 });

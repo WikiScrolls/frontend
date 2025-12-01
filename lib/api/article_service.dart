@@ -1,47 +1,94 @@
-import 'api_client.dart';
+import 'dart:convert';
 import 'models/article.dart';
 import 'models/pagination.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import '../config/env.dart';
 
 class ArticleService {
-  final ApiClient _client;
+  static const String _gorseBaseUrl = 'http://mf_recommender.digilabdte.com';
   
-  ArticleService({ApiClient? client}) : _client = client ?? ApiClient.instance;
+  ArticleService();
 
-  Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({int page = 1, int limit = 10, String sortBy = 'likeCount', String sortOrder = 'desc'}) async {
-    final http.Response res = await _client.get(
-      '/api/articles',
-      query: {
-        'page': page,
-        'limit': limit,
-        'sortBy': sortBy,
-        'sortOrder': sortOrder,
-      },
-    );
-    final data = _client.decode(res);
-    if (res.statusCode == 200 && data['success'] == true) {
-      // Backend returns { success: true, data: { articles: [...], pagination: {...} } }
-      final responseData = data['data'] as Map<String, dynamic>;
-      final rawArticles = (responseData['articles'] as List);
-      final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
-      if (kDebugMode) {
-        print('[ArticleService] Successfully loaded ${articles.length} articles');
-      }
-      return (articles, null);
+  String _buildGorseUrl(String path) {
+    // On web with CORS proxy enabled, route through /gorse/ prefix
+    if (kIsWeb && Env.useCorsProxy) {
+      return '${Env.corsProxy}/gorse$path';
     }
-    throw Exception(data['message'] ?? 'Failed to fetch articles');
+    return _gorseBaseUrl + path;
   }
 
-  // POST /api/articles/:id/view to record a view
-  Future<bool> recordView(String articleId) async {
+  // Get personalized recommendations from Gorse
+  Future<(List<ArticleModel> articles, PaginationInfo? pagination)> listArticles({String? userId, int limit = 10}) async {
     try {
-      final res = await _client.post('/api/articles/$articleId/view');
-      final data = _client.decode(res);
-      if (res.statusCode >= 200 && res.statusCode < 300 && data['success'] == true) {
+      // If userId is provided, get personalized recommendations
+      // Otherwise get random articles
+      final path = userId != null 
+        ? '/api/recommendation/$userId'
+        : '/api/recommendation/random?count=$limit';
+      
+      final endpoint = _buildGorseUrl(path);
+      
+      if (kDebugMode) {
+        print('[ArticleService] Requesting from Gorse: $endpoint');
+      }
+      
+      final http.Response res = await http.get(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        // Gorse returns {data: [...]} format
+        final rawArticles = data is List ? data : (data['data'] as List? ?? []);
+        final articles = rawArticles.map((e) => ArticleModel.fromJson(e as Map<String, dynamic>)).toList();
+        if (kDebugMode) {
+          print('[ArticleService] Successfully loaded ${articles.length} articles from Gorse');
+        }
+        return (articles, null);
+      }
+      
+      // Handle rate limiting or other errors
+      if (res.statusCode == 429) {
+        throw Exception('Too many requests. Please wait a moment and try again.');
+      }
+      
+      throw Exception('Failed to fetch articles: ${res.statusCode} - ${res.body}');
+    } catch (e) {
+      if (kDebugMode) {
+        print('[ArticleService] Error fetching articles: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // POST /api/articles/:id/open to record a view in Gorse
+  Future<bool> recordView(String articleId, String userId) async {
+    try {
+      final url = _buildGorseUrl('/api/articles/$articleId/open?userId=$userId');
+      if (kDebugMode) {
+        print('[ArticleService] Recording view to Gorse: $url');
+      }
+      
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        if (kDebugMode) {
+          print('[ArticleService] Recorded view for article $articleId');
+        }
         return true;
       }
-      throw Exception(data['message'] ?? 'Failed to record view');
+      throw Exception('Failed to record view');
     } catch (e) {
       if (kDebugMode) {
         print('[ArticleService] Failed to record view: $e');
@@ -50,8 +97,8 @@ class ArticleService {
     }
   }
 
-  // Retry loading real articles
-  Future<(List<ArticleModel> articles, PaginationInfo? pagination)> retryLoadArticles({int page = 1, int limit = 10}) async {
-    return listArticles(page: page, limit: limit);
+  // Retry loading articles
+  Future<(List<ArticleModel> articles, PaginationInfo? pagination)> retryLoadArticles({String? userId, int limit = 10}) async {
+    return listArticles(userId: userId, limit: limit);
   }
 }

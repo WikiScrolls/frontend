@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
 import '../api/models/article.dart';
 import '../api/interaction_service.dart';
-import '../widgets/send_article_dialog.dart';
+import '../state/auth_state.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
@@ -92,7 +93,12 @@ class _FeedPageState extends State<_FeedPage> {
     });
 
     try {
-        final result = await _service.listArticles();
+        // Get userId from AuthState
+        final authState = context.read<AuthState>();
+        final userId = authState.user?.id;
+        
+        // Fetch articles from Gorse recommendation API
+        final result = await _service.listArticles(userId: userId, limit: 10);
         final newData = result.$1;
 
         if (newData.isEmpty) {
@@ -152,7 +158,11 @@ class _FeedPageState extends State<_FeedPage> {
           itemCount: _articles.length,
           onPageChanged: _loadMoreIfNeeded,
           itemBuilder: (context, i) {
-            return _FullScreenArticle(article: _articles[i]);
+            final authState = context.watch<AuthState>();
+            return _FullScreenArticle(
+              article: _articles[i],
+              userId: authState.user?.id,
+            );
           },
         ),
 
@@ -252,7 +262,8 @@ class _FeedPageState extends State<_FeedPage> {
 
 class _FullScreenArticle extends StatefulWidget {
   final ArticleModel article;
-  const _FullScreenArticle({required this.article});
+  final String? userId;
+  const _FullScreenArticle({required this.article, this.userId});
 
   @override
   State<_FullScreenArticle> createState() => _FullScreenArticleState();
@@ -260,6 +271,7 @@ class _FullScreenArticle extends StatefulWidget {
 
 class _FullScreenArticleState extends State<_FullScreenArticle> {
   final _interactionService = InteractionService();
+  final _articleService = ArticleService();
   bool _isLiked = false;
   bool _isSaved = false;
   bool _loading = false;
@@ -268,6 +280,18 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
   void initState() {
     super.initState();
     _checkInteractions();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    // Record view to Gorse if userId is available
+    if (widget.userId != null) {
+      try {
+        await _articleService.recordView(widget.article.id, widget.userId!);
+      } catch (e) {
+        // Silently fail
+      }
+    }
   }
 
   Future<void> _checkInteractions() async {
@@ -286,11 +310,11 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
   }
 
   Future<void> _toggleLike() async {
-    if (_loading) return;
+    if (_loading || widget.userId == null) return;
     setState(() => _loading = true);
     
     try {
-      final newState = await _interactionService.toggleLike(widget.article.id, _isLiked);
+      final newState = await _interactionService.toggleLike(widget.article.id, widget.userId!, _isLiked);
       if (mounted) {
         setState(() {
           _isLiked = newState;
@@ -308,11 +332,11 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
   }
 
   Future<void> _toggleSave() async {
-    if (_loading) return;
+    if (_loading || widget.userId == null) return;
     setState(() => _loading = true);
     
     try {
-      final newState = await _interactionService.toggleSave(widget.article.id, _isSaved);
+      final newState = await _interactionService.toggleSave(widget.article.id, widget.userId!, _isSaved);
       if (mounted) {
         setState(() {
           _isSaved = newState;

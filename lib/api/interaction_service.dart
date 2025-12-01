@@ -2,10 +2,22 @@ import 'api_client.dart';
 import 'models/article.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import '../config/env.dart';
 
 class InteractionService {
   final ApiClient _client;
+  static const String _gorseBaseUrl = 'http://mf_recommender.digilabdte.com';
+  
   InteractionService({ApiClient? client}) : _client = client ?? ApiClient.instance;
+
+  String _buildGorseUrl(String path) {
+    // On web with CORS proxy enabled, route through /gorse/ prefix
+    if (kIsWeb && Env.useCorsProxy) {
+      return '${Env.corsProxy}/gorse$path';
+    }
+    return _gorseBaseUrl + path;
+  }
 
   // Local storage keys for dummy data interactions
   static const String _localLikesKey = 'local_likes';
@@ -37,8 +49,8 @@ class InteractionService {
     }
   }
 
-  // POST /api/interactions (like, bookmark, etc.)
-  Future<Map<String, dynamic>> createInteraction({required String articleId, required String interactionType}) async {
+  // POST /api/articles/:id/like to Gorse recommendation system
+  Future<Map<String, dynamic>> createInteraction({required String articleId, required String interactionType, required String userId}) async {
     // Handle dummy articles locally
     if (_isDummyArticle(articleId)) {
       final key = interactionType == 'LIKE' ? _localLikesKey : _localSavesKey;
@@ -49,6 +61,31 @@ class InteractionService {
     }
 
     try {
+      // For likes, send to Gorse recommendation API
+      if (interactionType == 'LIKE') {
+        final url = _buildGorseUrl('/api/articles/$articleId/like?userId=$userId');
+        if (kDebugMode) {
+          print('[InteractionService] Sending like to Gorse: $url');
+        }
+        
+        final res = await http.post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 30));
+        
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (kDebugMode) {
+            print('[InteractionService] Sent like to Gorse for article $articleId');
+          }
+          return {'success': true};
+        }
+        throw Exception('Failed to create like interaction');
+      }
+      
+      // For other types (SAVE, etc.), use the backend API
       final res = await _client.post('/api/interactions', body: {
         'articleId': articleId,
         'interactionType': interactionType,
@@ -177,23 +214,23 @@ class InteractionService {
   }
 
   // Helper: Toggle like on an article
-  Future<bool> toggleLike(String articleId, bool currentlyLiked) async {
+  Future<bool> toggleLike(String articleId, String userId, bool currentlyLiked) async {
     if (currentlyLiked) {
       await deleteInteraction(articleId: articleId, interactionType: 'LIKE');
       return false;
     } else {
-      await createInteraction(articleId: articleId, interactionType: 'LIKE');
+      await createInteraction(articleId: articleId, interactionType: 'LIKE', userId: userId);
       return true;
     }
   }
 
   // Helper: Toggle save on an article
-  Future<bool> toggleSave(String articleId, bool currentlySaved) async {
+  Future<bool> toggleSave(String articleId, String userId, bool currentlySaved) async {
     if (currentlySaved) {
       await deleteInteraction(articleId: articleId, interactionType: 'SAVE');
       return false;
     } else {
-      await createInteraction(articleId: articleId, interactionType: 'SAVE');
+      await createInteraction(articleId: articleId, interactionType: 'SAVE', userId: userId);
       return true;
     }
   }
