@@ -126,4 +126,29 @@ class ArticleService {
     }
     throw Exception(data['message'] ?? 'Failed to record view');
   }
+
+  /// GET /api/articles/:wikipediaId/summary from MF recommender
+  /// Fetches the AI-generated extended summary for an article
+  Future<String> getReadMore(String wikipediaId) async {
+    // Use MF recommender endpoint for summaries
+    final mfClient = ApiClient(baseUrl: 'https://mf_recommender.digilabdte.com');
+    final res = await mfClient.get('/api/articles/$wikipediaId/summary');
+    final data = mfClient.decode(res);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      // API returns {"data": "summary text..."} where data is the summary string directly
+      if (data is Map) {
+        final dataField = data['data'];
+        if (dataField is String) {
+          return dataField;
+        }
+        // Fallback for nested object format
+        return dataField?['summary'] as String? ?? 
+               data['summary'] as String? ?? 
+               data['content'] as String? ?? 
+               '';
+      }
+      return data.toString();
+    }
+    throw Exception(data['message'] ?? 'Failed to fetch summary');
+  }
 }

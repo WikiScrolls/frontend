@@ -1,14 +1,23 @@
 import 'package:flutter/foundation.dart';
 import '../api/interaction_service.dart';
+import '../api/pagerank_service.dart';
 import '../api/models/interaction_check.dart';
 
 /// State management for article interactions (like/save)
 /// Supports optimistic updates for a snappy UI experience
 class InteractionState extends ChangeNotifier {
   final InteractionService _service;
+  final PageRankService _pageRankService;
+  String? _userId; // Set this when user logs in
 
-  InteractionState({InteractionService? service})
-      : _service = service ?? InteractionService();
+  InteractionState({InteractionService? service, PageRankService? pageRankService})
+      : _service = service ?? InteractionService(),
+        _pageRankService = pageRankService ?? PageRankService();
+
+  /// Set the current user ID (needed for PageRank calls)
+  void setUserId(String? userId) {
+    _userId = userId;
+  }
 
   // Cache of interaction states: articleId -> InteractionCheck
   final Map<String, InteractionCheck> _cache = {};
@@ -78,19 +87,24 @@ class InteractionState extends ChangeNotifier {
     try {
       if (newLiked) {
         await _service.likeArticle(articleId);
+        // Also record like in PageRank service for recommendation weights
+        if (_userId != null) {
+          // Fire and forget - don't await to keep UI responsive
+          _pageRankService.recordLike(articleId: articleId, userId: _userId!);
+        }
       } else {
         await _service.unlikeArticle(articleId);
       }
     } catch (e) {
       // Rollback on error
       _cache[articleId] = currentState;
-      notifyListeners();
       if (kDebugMode) {
         print('[InteractionState] Error toggling like: $e');
       }
       rethrow;
     } finally {
       _pendingLikes.remove(articleId);
+      notifyListeners();
     }
   }
 
@@ -115,13 +129,13 @@ class InteractionState extends ChangeNotifier {
     } catch (e) {
       // Rollback on error
       _cache[articleId] = currentState;
-      notifyListeners();
       if (kDebugMode) {
         print('[InteractionState] Error toggling save: $e');
       }
       rethrow;
     } finally {
       _pendingSaves.remove(articleId);
+      notifyListeners();
     }
   }
 

@@ -5,6 +5,7 @@ import '../api/models/article.dart';
 import '../api/models/user_search_result.dart';
 import '../api/models/pagination.dart';
 import 'user_profile_screen.dart';
+import 'article_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
@@ -425,9 +426,11 @@ class _ArticleSearchCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // TODO: Navigate to article detail or show in feed
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Open article: ${article.title}')),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ArticleDetailScreen(article: article),
+            ),
           );
         },
         child: Padding(

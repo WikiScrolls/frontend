@@ -5,6 +5,7 @@ import '../api/auth_service.dart';
 import '../api/models/user.dart';
 import '../state/user_profile.dart';
 import '../state/auth_state.dart';
+import '../state/interaction_state.dart';
 import '../widgets/gradient_button.dart';
 import 'register_screen.dart';
 import 'login_success_screen.dart';
@@ -164,6 +165,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             final user = UserModel.fromJson(userJson);
                             if (!mounted) return;
                             await context.read<AuthState>().setSession(token: token, user: user);
+                            // Set userId for PageRank interactions
+                            context.read<InteractionState>().setUserId(user.id);
                             UserProfile.instance.username = user.username;
                             if (!mounted) return;
                             Navigator.of(context).push(

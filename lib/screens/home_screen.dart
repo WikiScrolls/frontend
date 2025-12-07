@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
+import '../api/pagerank_service.dart';
 import '../api/models/article.dart';
 import '../state/interaction_state.dart';
+import '../state/auth_state.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
@@ -219,12 +221,76 @@ class _FeedPageState extends State<_FeedPage> {
   }
 }
 
-class _FullScreenArticle extends StatelessWidget {
+class _FullScreenArticle extends StatefulWidget {
   final ArticleModel article;
   const _FullScreenArticle({required this.article});
 
   @override
+  State<_FullScreenArticle> createState() => _FullScreenArticleState();
+}
+
+class _FullScreenArticleState extends State<_FullScreenArticle> {
+  bool _isReadMoreLoading = false;
+  String? _extendedSummary;
+  bool _isExpanded = false;
+
+  Future<void> _handleReadMore() async {
+    if (_isReadMoreLoading) return;
+
+    // If already expanded, just toggle back
+    if (_isExpanded) {
+      setState(() => _isExpanded = false);
+      return;
+    }
+
+    // If we already have the summary, just expand
+    if (_extendedSummary != null) {
+      setState(() => _isExpanded = true);
+      return;
+    }
+
+    setState(() => _isReadMoreLoading = true);
+
+    try {
+      final articleService = ArticleService();
+      final pageRankService = PageRankService();
+      
+      // Get user ID for PageRank
+      final authState = context.read<AuthState>();
+      final userId = authState.user?.id;
+
+      // Use wikipediaId for MF recommender API, fall back to id if not available
+      final wikipediaId = widget.article.wikipediaId ?? widget.article.id;
+      
+      // Fetch extended summary
+      final summary = await articleService.getReadMore(wikipediaId);
+      
+      // Record open in PageRank (fire and forget)
+      if (userId != null) {
+        pageRankService.recordOpen(articleId: wikipediaId, userId: userId);
+      }
+
+      if (mounted) {
+        setState(() {
+          _extendedSummary = summary;
+          _isExpanded = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load more: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isReadMoreLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final article = widget.article;
+    
     // Use actual image URL if available, otherwise use placeholder
     final imageUrl = article.imageUrl ??
         "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
@@ -300,19 +366,23 @@ class _FullScreenArticle extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Content / AI Summary
-                Text(
-                  article.displayContent ?? "",
-                  maxLines: 14,
-                  overflow: TextOverflow.fade,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    height: 1.4,
-                    fontSize: 17,
+                // Content / AI Summary (expandable with Read More)
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _isExpanded && _extendedSummary != null
+                          ? _extendedSummary!
+                          : (article.displayContent ?? ""),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.4,
+                        fontSize: 17,
+                      ),
+                    ),
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 12),
 
                 // Tags
                 if (article.tags.isNotEmpty)
@@ -360,14 +430,12 @@ class _FullScreenArticle extends StatelessWidget {
                         context.read<InteractionState>().toggleLike(article.id);
                       },
                     ),
-                    // Comment button (placeholder)
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Comments coming soon!')),
-                        );
-                      },
+                    // Read More button
+                    _InteractionButton(
+                      icon: _isExpanded ? Icons.expand_less : Icons.auto_stories,
+                      color: _isExpanded ? AppColors.orange : Colors.white,
+                      isLoading: _isReadMoreLoading,
+                      onPressed: _handleReadMore,
                     ),
                     // Save button
                     _InteractionButton(

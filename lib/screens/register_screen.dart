@@ -8,6 +8,7 @@ import '../api/auth_service.dart';
 import '../api/models/user.dart';
 import '../state/user_profile.dart';
 import '../state/auth_state.dart';
+import '../state/interaction_state.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -196,6 +197,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                                 final user = UserModel.fromJson(userJson);
                                 if (!mounted) return;
                                 await context.read<AuthState>().setSession(token: token, user: user);
+                                // Set userId for PageRank interactions
+                                context.read<InteractionState>().setUserId(user.id);
                                 UserProfile.instance.username = user.username;
                                 if (!mounted) return;
                                 Navigator.of(context).push(
