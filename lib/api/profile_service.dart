@@ -1,6 +1,8 @@
 import 'api_client.dart';
 import 'package:http/http.dart' as http;
 import 'models/user.dart';
+import 'models/user_stats.dart';
+import 'models/public_profile.dart';
 
 class ProfileService {
   final ApiClient _client;
@@ -47,5 +49,27 @@ class ProfileService {
     if (res.statusCode == 204) return;
     final data = _client.decode(res);
     throw Exception(data['message'] ?? 'Failed to delete profile');
+  }
+
+  /// GET /api/profiles/me/stats
+  /// Returns user statistics (totalLikes, totalSaves, totalViews, etc.)
+  Future<UserStats> getMyStats() async {
+    final res = await _client.get('/api/profiles/me/stats');
+    final data = _client.decode(res);
+    if (res.statusCode == 200 && data['success'] == true) {
+      return UserStats.fromJson(data['data']);
+    }
+    throw Exception(data['message'] ?? 'Failed to fetch stats');
+  }
+
+  /// GET /api/profiles/public/:userId
+  /// Returns public profile of any user
+  Future<PublicProfile> getPublicProfile(String userId) async {
+    final res = await _client.get('/api/profiles/public/$userId');
+    final data = _client.decode(res);
+    if (res.statusCode == 200 && data['success'] == true) {
+      return PublicProfile.fromJson(data['data']);
+    }
+    throw Exception(data['message'] ?? 'Failed to fetch public profile');
   }
 }

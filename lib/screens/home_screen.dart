@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
 import '../api/models/article.dart';
+import '../state/interaction_state.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,11 +61,19 @@ class _FeedPageState extends State<_FeedPage> {
   int _page = 1;
   final int _limit = 5;
   String? _error;
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _fetch();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _preloadImages(List<ArticleModel> articles) async {
@@ -134,9 +145,17 @@ class _FeedPageState extends State<_FeedPage> {
       children: [
         // FULL-SCREEN SWIPE FEED (TikTok style)
         PageView.builder(
+          controller: _pageController,
           scrollDirection: Axis.vertical,
           itemCount: _articles.length,
-          onPageChanged: _loadMoreIfNeeded,
+          onPageChanged: (index) {
+            setState(() => _currentIndex = index);
+            _loadMoreIfNeeded(index);
+            // Fetch interaction status for newly visible articles
+            if (index < _articles.length) {
+              context.read<InteractionState>().fetchInteraction(_articles[index].id);
+            }
+          },
           itemBuilder: (context, i) {
             return _FullScreenArticle(article: _articles[i]);
           },
@@ -149,22 +168,31 @@ class _FeedPageState extends State<_FeedPage> {
           right: 0,
           child: Column(
             children: [
-              // Search bar
+              // Search bar - now tappable
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: AbsorbPointer(
-                  child: TextField(
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white12,
-                      hintText: "Search millions of topics…",
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SearchScreen()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.search, color: Colors.white70),
+                        SizedBox(width: 12),
+                        Text(
+                          'Search articles or users…',
+                          style: TextStyle(color: Colors.white54, fontSize: 16),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -197,8 +225,16 @@ class _FullScreenArticle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl =
+    // Use actual image URL if available, otherwise use placeholder
+    final imageUrl = article.imageUrl ??
         "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
+
+    // Watch interaction state for this article
+    final interactionState = context.watch<InteractionState>();
+    final isLiked = interactionState.isLiked(article.id);
+    final isSaved = interactionState.isSaved(article.id);
+    final isLikePending = interactionState.isLikePending(article.id);
+    final isSavePending = interactionState.isSavePending(article.id);
 
     return Container(
       color: Colors.black,
@@ -211,6 +247,12 @@ class _FullScreenArticle extends StatelessWidget {
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[900],
+                child: const Center(
+                  child: Icon(Icons.image_not_supported, color: Colors.white24, size: 64),
+                ),
+              ),
             ),
           ),
 
@@ -227,6 +269,25 @@ class _FullScreenArticle extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Category chip
+                if (article.category != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: _parseColor(article.category!.color),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      article.category!.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
                 // Title
                 Text(
                   article.title,
@@ -239,9 +300,9 @@ class _FullScreenArticle extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Content
+                // Content / AI Summary
                 Text(
-                  article.content ?? "",
+                  article.displayContent ?? "",
                   maxLines: 14,
                   overflow: TextOverflow.fade,
                   style: const TextStyle(
@@ -253,10 +314,36 @@ class _FullScreenArticle extends StatelessWidget {
 
                 const Spacer(),
 
+                // Tags
+                if (article.tags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: article.tags.take(5).map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '#$tag',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
                 // Bottom metadata + buttons
                 Row(
                   children: [
-                    _MetaIcon(icon: Icons.favorite, label: article.likeCount.toString()),
+                    _MetaIcon(
+                      icon: Icons.favorite,
+                      label: '${isLiked ? article.likeCount + 1 : article.likeCount}',
+                    ),
                     const SizedBox(width: 12),
                     if (article.createdAt != null)
                       _MetaIcon(
@@ -264,15 +351,33 @@ class _FullScreenArticle extends StatelessWidget {
                         label: _timeAgo(article.createdAt!),
                       ),
                     const Spacer(),
+                    // Like button
+                    _InteractionButton(
+                      icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? Colors.red : Colors.white,
+                      isLoading: isLikePending,
+                      onPressed: () {
+                        context.read<InteractionState>().toggleLike(article.id);
+                      },
+                    ),
+                    // Comment button (placeholder)
                     IconButton(
-                        icon: const Icon(Icons.favorite_border, color: Colors.white),
-                        onPressed: () {}),
-                    IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                        onPressed: () {}),
-                    IconButton(
-                        icon: const Icon(Icons.bookmark_border, color: Colors.white),
-                        onPressed: () {}),
+                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Comments coming soon!')),
+                        );
+                      },
+                    ),
+                    // Save button
+                    _InteractionButton(
+                      icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      color: isSaved ? AppColors.orange : Colors.white,
+                      isLoading: isSavePending,
+                      onPressed: () {
+                        context.read<InteractionState>().toggleSave(article.id);
+                      },
+                    ),
                   ],
                 ),
               ],
@@ -280,6 +385,47 @@ class _FullScreenArticle extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Color _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return AppColors.orange;
+    try {
+      final color = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$color', radix: 16));
+    } catch (_) {
+      return AppColors.orange;
+    }
+  }
+}
+
+class _InteractionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _InteractionButton({
+    required this.icon,
+    required this.color,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: isLoading
+          ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: color,
+              ),
+            )
+          : Icon(icon, color: color),
+      onPressed: isLoading ? null : onPressed,
     );
   }
 }
@@ -342,11 +488,11 @@ class _ArticleCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
 
-                    if (article.content != null)
+                    if (article.displayContent != null)
                       Text(
-                        article.content!.length > 180
-                            ? article.content!.substring(0, 180) + '…'
-                            : article.content!,
+                        article.displayContent!.length > 180
+                            ? article.displayContent!.substring(0, 180) + '…'
+                            : article.displayContent!,
                         style: const TextStyle(
                           color: Colors.white70,
                           height: 1.4,

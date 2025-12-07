@@ -7,7 +7,9 @@ void main() {
       final json = {
         'id': '123',
         'title': 'Test Article',
-        'content': 'Test content',
+        'wikipediaId': '456789',
+        'content': 'Raw Wikipedia content',
+        'aiSummary': 'AI generated summary',
         'likeCount': 42,
         'createdAt': '2024-01-15T10:30:00.000Z',
       };
@@ -16,7 +18,10 @@ void main() {
 
       expect(article.id, '123');
       expect(article.title, 'Test Article');
-      expect(article.content, 'Test content');
+      expect(article.wikipediaId, '456789');
+      expect(article.content, 'Raw Wikipedia content');
+      expect(article.aiSummary, 'AI generated summary');
+      expect(article.displayContent, 'AI generated summary'); // prefers aiSummary
       expect(article.likeCount, 42);
       expect(article.createdAt, isNotNull);
       expect(article.createdAt!.year, 2024);
@@ -35,20 +40,24 @@ void main() {
       expect(article.id, '456');
       expect(article.title, 'Minimal Article');
       expect(article.content, isNull);
+      expect(article.aiSummary, isNull);
+      expect(article.displayContent, isNull);
       expect(article.likeCount, 0);
       expect(article.createdAt, isNull);
     });
 
-    test('fromJson uses body field as fallback for content', () {
+    test('displayContent falls back to content when aiSummary is null', () {
       final json = {
         'id': '789',
-        'title': 'Article with body',
-        'body': 'Body content',
+        'title': 'Article with content only',
+        'content': 'Raw content here',
       };
 
       final article = ArticleModel.fromJson(json);
 
-      expect(article.content, 'Body content');
+      expect(article.aiSummary, isNull);
+      expect(article.content, 'Raw content here');
+      expect(article.displayContent, 'Raw content here');
     });
 
     test('fromJson handles numeric id correctly', () {
@@ -78,7 +87,9 @@ void main() {
       final article = ArticleModel(
         id: '123',
         title: 'Test Article',
-        content: 'Test content',
+        wikipediaId: '456789',
+        content: 'Raw content',
+        aiSummary: 'AI summary',
         likeCount: 42,
         createdAt: DateTime(2024, 1, 15, 10, 30),
       );
@@ -87,7 +98,9 @@ void main() {
 
       expect(json['id'], '123');
       expect(json['title'], 'Test Article');
-      expect(json['content'], 'Test content');
+      expect(json['wikipediaId'], '456789');
+      expect(json['content'], 'Raw content');
+      expect(json['aiSummary'], 'AI summary');
       expect(json['likeCount'], 42);
       expect(json['createdAt'], isNotNull);
     });
@@ -101,6 +114,7 @@ void main() {
       final json = article.toJson();
 
       expect(json['content'], isNull);
+      expect(json['aiSummary'], isNull);
       expect(json['createdAt'], isNull);
     });
 
@@ -108,7 +122,9 @@ void main() {
       final original = ArticleModel(
         id: '555',
         title: 'Round Trip Test',
-        content: 'Content here',
+        wikipediaId: '12345',
+        content: 'Raw content here',
+        aiSummary: 'AI summary here',
         likeCount: 100,
         createdAt: DateTime(2024, 6, 1),
       );
@@ -118,7 +134,9 @@ void main() {
 
       expect(restored.id, original.id);
       expect(restored.title, original.title);
+      expect(restored.wikipediaId, original.wikipediaId);
       expect(restored.content, original.content);
+      expect(restored.aiSummary, original.aiSummary);
       expect(restored.likeCount, original.likeCount);
       expect(restored.createdAt, original.createdAt);
     });

@@ -8,16 +8,22 @@ class MockDataFactory {
   static ArticleModel createArticle({
     String? id,
     String? title,
-    String? content,
+    String? aiSummary,
     int? likeCount,
     DateTime? createdAt,
+    String? imageUrl,
+    String? wikipediaUrl,
+    List<String>? tags,
   }) {
     return ArticleModel(
       id: id ?? 'article-${DateTime.now().millisecondsSinceEpoch}',
       title: title ?? 'Test Article',
-      content: content ?? 'Test content for article',
+      aiSummary: aiSummary ?? 'Test content for article',
       likeCount: likeCount ?? 0,
       createdAt: createdAt ?? DateTime.now(),
+      imageUrl: imageUrl,
+      wikipediaUrl: wikipediaUrl,
+      tags: tags ?? [],
     );
   }
 
@@ -28,7 +34,7 @@ class MockDataFactory {
       (index) => createArticle(
         id: 'article-$index',
         title: 'Test Article $index',
-        content: 'Content for article $index',
+        aiSummary: 'Content for article $index',
         likeCount: index * 10,
       ),
     );
@@ -67,16 +73,16 @@ class MockDataFactory {
   static PaginationInfo createPagination({
     int? page,
     int? limit,
-    int? totalItems,
+    int? total,
     int? totalPages,
   }) {
-    final itemCount = totalItems ?? 100;
+    final itemCount = total ?? 100;
     final itemsPerPage = limit ?? 10;
     
     return PaginationInfo(
       page: page ?? 1,
       limit: itemsPerPage,
-      totalItems: itemCount,
+      total: itemCount,
       totalPages: totalPages ?? (itemCount / itemsPerPage).ceil(),
     );
   }

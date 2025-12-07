@@ -7,7 +7,7 @@ void main() {
       final json = {
         'page': 2,
         'limit': 20,
-        'totalItems': 150,
+        'total': 150,
         'totalPages': 8,
       };
 
@@ -15,7 +15,7 @@ void main() {
 
       expect(pagination.page, 2);
       expect(pagination.limit, 20);
-      expect(pagination.totalItems, 150);
+      expect(pagination.total, 150);
       expect(pagination.totalPages, 8);
     });
 
@@ -25,8 +25,8 @@ void main() {
       final pagination = PaginationInfo.fromJson(json);
 
       expect(pagination.page, 1);
-      expect(pagination.limit, 10);
-      expect(pagination.totalItems, 0);
+      expect(pagination.limit, 20);
+      expect(pagination.total, 0);
       expect(pagination.totalPages, 0);
     });
 
@@ -34,7 +34,7 @@ void main() {
       final json = {
         'page': 3.0,
         'limit': 15.0,
-        'totalItems': 200.0,
+        'total': 200.0,
         'totalPages': 14.0,
       };
 
@@ -42,7 +42,7 @@ void main() {
 
       expect(pagination.page, 3);
       expect(pagination.limit, 15);
-      expect(pagination.totalItems, 200);
+      expect(pagination.total, 200);
       expect(pagination.totalPages, 14);
     });
 
@@ -50,7 +50,7 @@ void main() {
       const pagination = PaginationInfo(
         page: 3,
         limit: 25,
-        totalItems: 300,
+        total: 300,
         totalPages: 12,
       );
 
@@ -58,7 +58,7 @@ void main() {
 
       expect(json['page'], 3);
       expect(json['limit'], 25);
-      expect(json['totalItems'], 300);
+      expect(json['total'], 300);
       expect(json['totalPages'], 12);
     });
 
@@ -66,7 +66,7 @@ void main() {
       const original = PaginationInfo(
         page: 5,
         limit: 50,
-        totalItems: 500,
+        total: 500,
         totalPages: 10,
       );
 
@@ -75,7 +75,7 @@ void main() {
 
       expect(restored.page, original.page);
       expect(restored.limit, original.limit);
-      expect(restored.totalItems, original.totalItems);
+      expect(restored.total, original.total);
       expect(restored.totalPages, original.totalPages);
     });
 
@@ -83,17 +83,50 @@ void main() {
       const pagination1 = PaginationInfo(
         page: 1,
         limit: 10,
-        totalItems: 100,
+        total: 100,
         totalPages: 10,
       );
       const pagination2 = PaginationInfo(
         page: 1,
         limit: 10,
-        totalItems: 100,
+        total: 100,
         totalPages: 10,
       );
 
       expect(identical(pagination1, pagination2), true);
+    });
+
+    test('hasNextPage returns true when more pages exist', () {
+      const pagination = PaginationInfo(
+        page: 1,
+        limit: 10,
+        total: 100,
+        totalPages: 10,
+      );
+
+      expect(pagination.hasNextPage, true);
+    });
+
+    test('hasNextPage returns false on last page', () {
+      const pagination = PaginationInfo(
+        page: 10,
+        limit: 10,
+        total: 100,
+        totalPages: 10,
+      );
+
+      expect(pagination.hasNextPage, false);
+    });
+
+    test('totalItems alias returns total', () {
+      const pagination = PaginationInfo(
+        page: 1,
+        limit: 10,
+        total: 100,
+        totalPages: 10,
+      );
+
+      expect(pagination.totalItems, 100);
     });
   });
 }

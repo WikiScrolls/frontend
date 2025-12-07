@@ -144,7 +144,7 @@ void main() {
       test('returns true when interaction exists', () async {
         mockClient.setResponse('get', {
           'success': true,
-          'data': {'interacted': true}
+          'data': {'liked': true, 'saved': false}
         });
         mockClient.setResponse('statusCode', 200);
 
@@ -156,13 +156,53 @@ void main() {
       test('returns false when interaction does not exist', () async {
         mockClient.setResponse('get', {
           'success': true,
-          'data': {'interacted': false}
+          'data': {'liked': false, 'saved': false}
         });
         mockClient.setResponse('statusCode', 200);
 
         final hasInteracted = await interactionService.hasInteraction('article456');
 
         expect(hasInteracted, false);
+      });
+
+      test('returns true when only saved', () async {
+        mockClient.setResponse('get', {
+          'success': true,
+          'data': {'liked': false, 'saved': true}
+        });
+        mockClient.setResponse('statusCode', 200);
+
+        final hasInteracted = await interactionService.hasInteraction('article789');
+
+        expect(hasInteracted, true);
+      });
+    });
+
+    group('checkInteraction', () {
+      test('returns InteractionCheck with both liked and saved', () async {
+        mockClient.setResponse('get', {
+          'success': true,
+          'data': {'liked': true, 'saved': true}
+        });
+        mockClient.setResponse('statusCode', 200);
+
+        final check = await interactionService.checkInteraction('article123');
+
+        expect(check.liked, true);
+        expect(check.saved, true);
+      });
+
+      test('returns InteractionCheck with both false', () async {
+        mockClient.setResponse('get', {
+          'success': true,
+          'data': {'liked': false, 'saved': false}
+        });
+        mockClient.setResponse('statusCode', 200);
+
+        final check = await interactionService.checkInteraction('article456');
+
+        expect(check.liked, false);
+        expect(check.saved, false);
       });
     });
   });

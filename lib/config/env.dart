@@ -3,7 +3,7 @@ class Env {
   // Production hosted backend URL defaults here so builds work without extra flags.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://backend-production-cc13.up.railway.app',
+    defaultValue: 'https://jd_backend.digilabdte.com/',
   );
 
   // For Flutter Web dev, you can route API calls through a local CORS proxy to avoid browser CORS issues.
