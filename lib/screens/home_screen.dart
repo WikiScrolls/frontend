@@ -62,11 +62,19 @@ class _FeedPageState extends State<_FeedPage> {
   bool _loading = false;
   bool _end = false;
   String? _error;
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _fetch();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _preloadImages(List<ArticleModel> articles) async {
@@ -154,9 +162,17 @@ class _FeedPageState extends State<_FeedPage> {
       children: [
         // FULL-SCREEN SWIPE FEED (TikTok style)
         PageView.builder(
+          controller: _pageController,
           scrollDirection: Axis.vertical,
           itemCount: _articles.length,
-          onPageChanged: _loadMoreIfNeeded,
+          onPageChanged: (index) {
+            setState(() => _currentIndex = index);
+            _loadMoreIfNeeded(index);
+            // Fetch interaction status for newly visible articles
+            if (index < _articles.length) {
+              context.read<InteractionState>().fetchInteraction(_articles[index].id);
+            }
+          },
           itemBuilder: (context, i) {
             final authState = context.watch<AuthState>();
             return _FullScreenArticle(
@@ -173,7 +189,7 @@ class _FeedPageState extends State<_FeedPage> {
           right: 0,
           child: Column(
             children: [
-              // Search bar
+              // Search bar - now tappable
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: GestureDetector(
@@ -364,6 +380,13 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
     final imageUrl =
         "https://picsum.photos/seed/${widget.article.title.hashCode}/900/1600";
 
+    // Watch interaction state for this article
+    final interactionState = context.watch<InteractionState>();
+    final isLiked = interactionState.isLiked(article.id);
+    final isSaved = interactionState.isSaved(article.id);
+    final isLikePending = interactionState.isLikePending(article.id);
+    final isSavePending = interactionState.isSavePending(article.id);
+
     return Container(
       color: Colors.black,
       width: double.infinity,
@@ -375,6 +398,12 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[900],
+                child: const Center(
+                  child: Icon(Icons.image_not_supported, color: Colors.white24, size: 64),
+                ),
+              ),
             ),
           ),
 
@@ -391,6 +420,25 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Category chip
+                if (article.category != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: _parseColor(article.category!.color),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      article.category!.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
                 // Title
                 Text(
                   widget.article.title,
@@ -403,7 +451,7 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
 
                 const SizedBox(height: 16),
 
-                // Content
+                // Content / AI Summary
                 Text(
                   widget.article.content ?? "",
                   maxLines: 14,
@@ -417,6 +465,29 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
 
                 const Spacer(),
 
+                // Tags
+                if (article.tags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: article.tags.take(5).map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '#$tag',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
                 // Bottom metadata + buttons
                 Row(
                   children: [
@@ -428,6 +499,16 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
                         label: _timeAgo(widget.article.createdAt!),
                       ),
                     const Spacer(),
+                    // Like button
+                    _InteractionButton(
+                      icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? Colors.red : Colors.white,
+                      isLoading: isLikePending,
+                      onPressed: () {
+                        context.read<InteractionState>().toggleLike(article.id);
+                      },
+                    ),
+                    // Comment button (placeholder)
                     IconButton(
                         icon: Icon(
                           _isLiked ? Icons.favorite : Icons.favorite_border,
