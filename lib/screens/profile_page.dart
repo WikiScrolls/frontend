@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../state/auth_state.dart';
-import '../api/profile_service.dart';
-import '../api/interaction_service.dart';
-import '../api/models/user_stats.dart';
-import '../api/models/article.dart';
-import '../api/models/pagination.dart';
+import 'liked_articles_screen.dart';
+import 'saved_articles_screen.dart';
+import 'friends_list_screen.dart';
+import 'following_list_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -329,9 +328,84 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Start exploring to add articles here!',
-              style: TextStyle(color: Colors.white38, fontSize: 14),
+            
+            // Bio (template)
+            Text(
+              'Love learning new things every day! 📚✨',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Friends and Followers stats
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const FriendsListScreen()),
+                    );
+                  },
+                  child: _StatItem(count: '0', label: 'Friends'),
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  color: Colors.white24,
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const FollowingListScreen()),
+                    );
+                  },
+                  child: _StatItem(count: '0', label: 'Followers'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Activity tabs
+            _ActivitySection(
+              icon: Icons.comment_outlined,
+              title: 'Past Comments',
+              count: '0',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Comments feature coming soon')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ActivitySection(
+              icon: Icons.favorite_border,
+              title: 'Past Likes',
+              count: '?',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LikedArticlesScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ActivitySection(
+              icon: Icons.bookmark_border,
+              title: 'Saved Posts',
+              count: '?',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SavedArticlesScreen()),
+                );
+              },
             ),
           ],
         ),

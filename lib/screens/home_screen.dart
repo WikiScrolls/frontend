@@ -3,11 +3,14 @@ import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../api/article_service.dart';
 import '../api/models/article.dart';
-import '../state/interaction_state.dart';
+import '../api/interaction_service.dart';
+import '../state/auth_state.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
 import 'search_screen.dart';
+import 'friends_list_screen.dart';
+import 'following_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,8 +61,6 @@ class _FeedPageState extends State<_FeedPage> {
   List<ArticleModel> _articles = [];
   bool _loading = false;
   bool _end = false;
-  int _page = 1;
-  final int _limit = 5;
   String? _error;
   final PageController _pageController = PageController();
   int _currentIndex = 0;
@@ -87,13 +88,25 @@ class _FeedPageState extends State<_FeedPage> {
     }
 
 
-  Future<void> _fetch() async {
-    if (_loading || _end) return;
+  Future<void> _fetch({bool refresh = false}) async {
+    if (_loading || (_end && !refresh)) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      if (refresh) {
+        _articles.clear();
+        _end = false;
+        _error = null;
+      }
+    });
 
     try {
-        final result = await _service.listArticles();
+        // Get userId from AuthState
+        final authState = context.read<AuthState>();
+        final userId = authState.user?.id;
+        
+        // Fetch articles from Gorse recommendation API
+        final result = await _service.listArticles(userId: userId, limit: 10);
         final newData = result.$1;
 
         if (newData.isEmpty) {
@@ -116,6 +129,10 @@ class _FeedPageState extends State<_FeedPage> {
     if (index >= _articles.length - 2 && !_loading && !_end) {
       _fetch();
     }
+  }
+
+  Future<void> _refreshArticles() async {
+    await _fetch(refresh: true);
   }
 
   @override
@@ -157,7 +174,11 @@ class _FeedPageState extends State<_FeedPage> {
             }
           },
           itemBuilder: (context, i) {
-            return _FullScreenArticle(article: _articles[i]);
+            final authState = context.watch<AuthState>();
+            return _FullScreenArticle(
+              article: _articles[i],
+              userId: authState.user?.id,
+            );
           },
         ),
 
@@ -175,24 +196,23 @@ class _FeedPageState extends State<_FeedPage> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const SearchScreen()),
+                      MaterialPageRoute(builder: (context) => const SearchScreen()),
                     );
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white12,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.search, color: Colors.white70),
-                        SizedBox(width: 12),
-                        Text(
-                          'Search articles or users…',
-                          style: TextStyle(color: Colors.white54, fontSize: 16),
+                  child: AbsorbPointer(
+                    child: TextField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white12,
+                        hintText: "Search millions of topics…",
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -203,15 +223,52 @@ class _FeedPageState extends State<_FeedPage> {
               // Tabs
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _TabChip(label: "Friends"),
-                  SizedBox(width: 12),
-                  _TabChip(label: "Following"),
-                  SizedBox(width: 12),
-                  _TabChip(label: "For You", selected: true),
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FriendsListScreen()),
+                      );
+                    },
+                    child: const _TabChip(label: "Friends"),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const FollowingListScreen()),
+                      );
+                    },
+                    child: const _TabChip(label: "Following"),
+                  ),
+                  const SizedBox(width: 12),
+                  const _TabChip(label: "For You", selected: true),
                 ],
               )
             ],
+          ),
+        ),
+
+        // ----- FLOATING REFRESH BUTTON -----
+        Positioned(
+          bottom: 80,
+          right: 16,
+          child: FloatingActionButton(
+            mini: true,
+            backgroundColor: Colors.white24,
+            onPressed: _refreshArticles,
+            child: _loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white),
           ),
         ),
       ],
@@ -219,15 +276,109 @@ class _FeedPageState extends State<_FeedPage> {
   }
 }
 
-class _FullScreenArticle extends StatelessWidget {
+class _FullScreenArticle extends StatefulWidget {
   final ArticleModel article;
-  const _FullScreenArticle({required this.article});
+  final String? userId;
+  const _FullScreenArticle({required this.article, this.userId});
+
+  @override
+  State<_FullScreenArticle> createState() => _FullScreenArticleState();
+}
+
+class _FullScreenArticleState extends State<_FullScreenArticle> {
+  final _interactionService = InteractionService();
+  final _articleService = ArticleService();
+  bool _isLiked = false;
+  bool _isSaved = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInteractions();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    // Record view to Gorse if userId is available
+    if (widget.userId != null) {
+      try {
+        await _articleService.recordView(widget.article.id, widget.userId!);
+      } catch (e) {
+        // Silently fail
+      }
+    }
+  }
+
+  Future<void> _checkInteractions() async {
+    try {
+      final liked = await _interactionService.hasInteraction(widget.article.id, type: 'LIKE');
+      final saved = await _interactionService.hasInteraction(widget.article.id, type: 'SAVE');
+      if (mounted) {
+        setState(() {
+          _isLiked = liked;
+          _isSaved = saved;
+        });
+      }
+    } catch (e) {
+      // Silently fail - user might not be logged in
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_loading || widget.userId == null) return;
+    setState(() => _loading = true);
+    
+    try {
+      final newState = await _interactionService.toggleLike(widget.article.id, widget.userId!, _isLiked);
+      if (mounted) {
+        setState(() {
+          _isLiked = newState;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to like: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    if (_loading || widget.userId == null) return;
+    setState(() => _loading = true);
+    
+    try {
+      final newState = await _interactionService.toggleSave(widget.article.id, widget.userId!, _isSaved);
+      if (mounted) {
+        setState(() {
+          _isSaved = newState;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    }
+  }
+
+  void _showComments() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Comments feature coming soon')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Use actual image URL if available, otherwise use placeholder
-    final imageUrl = article.imageUrl ??
-        "https://picsum.photos/seed/${article.title.hashCode}/900/1600";
+    final imageUrl =
+        "https://picsum.photos/seed/${widget.article.title.hashCode}/900/1600";
 
     // Watch interaction state for this article
     final interactionState = context.watch<InteractionState>();
@@ -290,7 +441,7 @@ class _FullScreenArticle extends StatelessWidget {
 
                 // Title
                 Text(
-                  article.title,
+                  widget.article.title,
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
@@ -302,7 +453,7 @@ class _FullScreenArticle extends StatelessWidget {
 
                 // Content / AI Summary
                 Text(
-                  article.displayContent ?? "",
+                  widget.article.content ?? "",
                   maxLines: 14,
                   overflow: TextOverflow.fade,
                   style: const TextStyle(
@@ -340,15 +491,12 @@ class _FullScreenArticle extends StatelessWidget {
                 // Bottom metadata + buttons
                 Row(
                   children: [
-                    _MetaIcon(
-                      icon: Icons.favorite,
-                      label: '${isLiked ? article.likeCount + 1 : article.likeCount}',
-                    ),
+                    _MetaIcon(icon: Icons.favorite, label: widget.article.likeCount.toString()),
                     const SizedBox(width: 12),
-                    if (article.createdAt != null)
+                    if (widget.article.createdAt != null)
                       _MetaIcon(
                         icon: Icons.access_time,
-                        label: _timeAgo(article.createdAt!),
+                        label: _timeAgo(widget.article.createdAt!),
                       ),
                     const Spacer(),
                     // Like button
@@ -362,185 +510,26 @@ class _FullScreenArticle extends StatelessWidget {
                     ),
                     // Comment button (placeholder)
                     IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Comments coming soon!')),
-                        );
-                      },
-                    ),
-                    // Save button
-                    _InteractionButton(
-                      icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
-                      color: isSaved ? AppColors.orange : Colors.white,
-                      isLoading: isSavePending,
-                      onPressed: () {
-                        context.read<InteractionState>().toggleSave(article.id);
-                      },
-                    ),
+                        icon: Icon(
+                          _isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: _isLiked ? AppColors.orange : Colors.white,
+                        ),
+                        onPressed: _toggleLike),
+                    IconButton(
+                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                        onPressed: _showComments),
+                    IconButton(
+                        icon: Icon(
+                          _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: _isSaved ? AppColors.orange : Colors.white,
+                        ),
+                        onPressed: _toggleSave),
                   ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.orange;
-    try {
-      final color = hex.replaceFirst('#', '');
-      return Color(int.parse('FF$color', radix: 16));
-    } catch (_) {
-      return AppColors.orange;
-    }
-  }
-}
-
-class _InteractionButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  const _InteractionButton({
-    required this.icon,
-    required this.color,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: isLoading
-          ? SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: color,
-              ),
-            )
-          : Icon(icon, color: color),
-      onPressed: isLoading ? null : onPressed,
-    );
-  }
-}
-
-
-// Shared utilities
-String _timeAgo(DateTime dt) {
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-  if (diff.inHours < 24) return '${diff.inHours}h';
-  return '${diff.inDays}d';
-}
-
-
-class _ArticleCard extends StatelessWidget {
-  final ArticleModel article;
-  const _ArticleCard({required this.article});
-
-  @override
-  Widget build(BuildContext context) {
-    final randomImageUrl =
-        "https://picsum.photos/seed/${article.id ?? article.title.hashCode}/500/300";
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white24, width: 0.5),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Main content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- NEW IMAGE HERE ---
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        randomImageUrl,
-                        height: 160,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Text(
-                      article.title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (article.displayContent != null)
-                      Text(
-                        article.displayContent!.length > 180
-                            ? article.displayContent!.substring(0, 180) + '…'
-                            : article.displayContent!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.4,
-                          fontSize: 14,
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _MetaIcon(
-                          icon: Icons.favorite,
-                          label: article.likeCount.toString(),
-                        ),
-                        if (article.createdAt != null)
-                          _MetaIcon(
-                            icon: Icons.access_time,
-                            label: _timeAgo(article.createdAt!),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Actions
-            Container(
-              width: 56,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _ActionIcon(icon: Icons.favorite_border),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.chat_bubble_outline),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.bookmark_border),
-                  SizedBox(height: 12),
-                  _ActionIcon(icon: Icons.send_outlined),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -553,7 +542,6 @@ class _ArticleCard extends StatelessWidget {
     return '${diff.inDays}d';
   }
 }
-
 
 class _MetaIcon extends StatelessWidget {
   final IconData icon;
@@ -592,27 +580,3 @@ class _TabChip extends StatelessWidget {
     );
   }
 }
-
-class _ActionIcon extends StatelessWidget {
-  final IconData icon;
-  const _ActionIcon({required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(icon),
-        color: Colors.white,
-        onPressed: () {},
-      ),
-    );
-  }
-}
-
-// _TagChip removed (unused after integrating real feed)
-// Old stub pages (_NotificationsPage, old ProfilePage, _SettingsPage, _SimpleScaffold) removed; using standalone pages now
-

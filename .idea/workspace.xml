@@ -5,10 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="11d24ffc-542b-4b1e-b34f-d6d3ab809c8f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FRONTEND_API_GUIDE.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/article_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/article_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/auth_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/auth_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/interaction_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/interaction_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/screens/home_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/screens/home_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/cors-proxy.js" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/cors-proxy.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
