@@ -151,4 +151,63 @@ class ArticleService {
     }
     throw Exception(data['message'] ?? 'Failed to fetch summary');
   }
+
+  /// PATCH /api/articles/:id to update article fields (aiSummary, audioUrl, etc.)
+  Future<ArticleModel?> updateArticle(String articleId, {
+    String? aiSummary,
+    String? audioUrl,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (aiSummary != null) body['aiSummary'] = aiSummary;
+      if (audioUrl != null) body['audioUrl'] = audioUrl;
+      
+      if (body.isEmpty) return null;
+      
+      final res = await _client.patch('/api/articles/$articleId', body: body);
+      final data = _client.decode(res);
+
+      if (res.statusCode >= 200 && res.statusCode < 300 && data['success'] == true) {
+        return ArticleModel.fromJson(data['data']['article'] as Map<String, dynamic>);
+      }
+      print('[ArticleService] Update article failed: ${data['message']}');
+      return null;
+    } catch (e) {
+      print('[ArticleService] Update article error: $e');
+      return null;
+    }
+  }
+
+  /// Upload audio file to backend and get URL
+  /// POST /api/articles/:id/audio with multipart form data
+  Future<String?> uploadAudio(String articleId, List<int> audioBytes) async {
+    try {
+      final uri = Uri.parse('${_client.baseUrl}api/articles/$articleId/audio');
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add auth header if available
+      if (_client.token != null) {
+        request.headers['Authorization'] = 'Bearer ${_client.token}';
+      }
+      
+      request.files.add(http.MultipartFile.fromBytes(
+        'audio',
+        audioBytes,
+        filename: 'tts_$articleId.wav',
+      ));
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final data = _client.decode(response);
+      
+      if (response.statusCode >= 200 && response.statusCode < 300 && data['success'] == true) {
+        return data['data']['audioUrl'] as String?;
+      }
+      print('[ArticleService] Upload audio failed: ${data['message']}');
+      return null;
+    } catch (e) {
+      print('[ArticleService] Upload audio error: $e');
+      return null;
+    }
+  }
 }

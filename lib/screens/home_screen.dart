@@ -6,6 +6,7 @@ import '../api/pagerank_service.dart';
 import '../api/models/article.dart';
 import '../state/interaction_state.dart';
 import '../state/auth_state.dart';
+import '../state/tts_state.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'notifications_page.dart';
@@ -101,10 +102,17 @@ class _FeedPageState extends State<_FeedPage> {
         if (newData.isEmpty) {
         _end = true;
         } else {
+        final isFirstLoad = _articles.isEmpty;
         _articles.addAll(newData);
 
         // ---- PRELOAD IMAGES HERE ----
         _preloadImages(newData);
+        
+        // Auto-play TTS for first article on initial load
+        if (isFirstLoad && _articles.isNotEmpty && mounted) {
+          final article = _articles[0];
+          context.read<TtsState>().playArticleFromModel(article);
+        }
         }
     } catch (e) {
         _error = e.toString();
@@ -156,6 +164,9 @@ class _FeedPageState extends State<_FeedPage> {
             // Fetch interaction status for newly visible articles
             if (index < _articles.length) {
               context.read<InteractionState>().fetchInteraction(_articles[index].id);
+              // Auto-play TTS for the new article
+              final article = _articles[index];
+              context.read<TtsState>().playArticleFromModel(article);
             }
           },
           itemBuilder: (context, i) {
@@ -234,6 +245,15 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
   String? _extendedSummary;
   bool _isExpanded = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Pre-populate extended summary if article already has aiSummary from DB
+    if (widget.article.aiSummary != null && widget.article.aiSummary!.isNotEmpty) {
+      _extendedSummary = widget.article.aiSummary;
+    }
+  }
+
   Future<void> _handleReadMore() async {
     if (_isReadMoreLoading) return;
 
@@ -243,7 +263,7 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
       return;
     }
 
-    // If we already have the summary, just expand
+    // If we already have the summary (from DB or previous fetch), just expand
     if (_extendedSummary != null) {
       setState(() => _isExpanded = true);
       return;
@@ -262,13 +282,16 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
       // Use wikipediaId for MF recommender API, fall back to id if not available
       final wikipediaId = widget.article.wikipediaId ?? widget.article.id;
       
-      // Fetch extended summary
+      // Fetch extended summary from MF recommender
       final summary = await articleService.getReadMore(wikipediaId);
       
       // Record open in PageRank (fire and forget)
       if (userId != null) {
         pageRankService.recordOpen(articleId: wikipediaId, userId: userId);
       }
+      
+      // Save aiSummary to database for future use (fire and forget)
+      articleService.updateArticle(widget.article.id, aiSummary: summary);
 
       if (mounted) {
         setState(() {
@@ -444,6 +467,36 @@ class _FullScreenArticleState extends State<_FullScreenArticle> {
                       isLoading: isSavePending,
                       onPressed: () {
                         context.read<InteractionState>().toggleSave(article.id);
+                      },
+                    ),
+                    // TTS button
+                    Consumer<TtsState>(
+                      builder: (context, ttsState, _) {
+                        final isCurrentArticle = ttsState.currentArticleId == article.id;
+                        final isPlaying = isCurrentArticle && ttsState.isPlaying;
+                        final isLoading = isCurrentArticle && ttsState.isLoading;
+                        
+                        return _InteractionButton(
+                          icon: !ttsState.isEnabled
+                              ? Icons.volume_off
+                              : isPlaying
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_filled,
+                          color: ttsState.isEnabled ? AppColors.orange : Colors.white54,
+                          isLoading: isLoading,
+                          onPressed: () {
+                            if (!ttsState.isEnabled) {
+                              ttsState.setEnabled(true);
+                              ttsState.playArticleFromModel(article);
+                            } else if (isCurrentArticle && isPlaying) {
+                              ttsState.pause();
+                            } else if (isCurrentArticle) {
+                              ttsState.resume();
+                            } else {
+                              ttsState.playArticleFromModel(article);
+                            }
+                          },
+                        );
                       },
                     ),
                   ],

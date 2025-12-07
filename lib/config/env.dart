@@ -13,4 +13,10 @@ class Env {
 
   // The proxy base URL. Our simple proxy in scripts/cors-proxy.js defaults to http://localhost:8787
   static const String corsProxy = String.fromEnvironment('CORS_PROXY', defaultValue: 'http://localhost:8787');
+
+  // Gemini TTS API key for text-to-speech functionality
+  static const String ttsApiKey = String.fromEnvironment(
+    'TTS_API_KEY',
+    defaultValue: 'AIzaSyAazU1pi0EPlPdnL-_Zd4hFHgt04OACS3Y',
+  );
 }

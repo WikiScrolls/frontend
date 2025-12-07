@@ -5,6 +5,7 @@ import 'screens/onboarding_screen.dart';
 import 'theme/app_colors.dart';
 import 'state/auth_state.dart';
 import 'state/interaction_state.dart';
+import 'state/tts_state.dart';
 import 'dart:io';
 
 // Source - https://stackoverflow.com/a
@@ -28,6 +29,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()..loadToken()),
         ChangeNotifierProvider(create: (_) => InteractionState()),
+        ChangeNotifierProvider(create: (_) => TtsState()),
       ],
       child: const WikiScrollsApp(),
     ),
