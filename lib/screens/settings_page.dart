@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../state/auth_state.dart';
+import '../state/theme_state.dart';
 import 'onboarding_screen.dart';
 import 'account_settings_page.dart';
 
@@ -11,6 +12,9 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
+    final themeState = context.watch<ThemeState>();
+    final isDark = themeState.isDarkMode;
+    
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -33,14 +37,15 @@ class SettingsPage extends StatelessWidget {
           ),
           const Divider(color: Colors.white24),
           _SettingTile(
-            icon: Icons.dark_mode,
-            title: 'Dark Mode',
-            subtitle: 'Always on',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme toggle coming soon')),
-              );
-            },
+            icon: isDark ? Icons.dark_mode : Icons.light_mode,
+            title: isDark ? 'Dark Mode' : 'Light Mode',
+            subtitle: 'Tap to switch to ${isDark ? 'light' : 'dark'} mode',
+            trailing: Switch(
+              value: isDark,
+              activeColor: AppColors.orange,
+              onChanged: (_) => themeState.toggleTheme(),
+            ),
+            onTap: () => themeState.toggleTheme(),
           ),
           const Divider(color: Colors.white24),
           _SettingTile(
@@ -93,21 +98,24 @@ class _SettingTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Widget? trailing;
 
   const _SettingTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       leading: Icon(icon, color: AppColors.orange),
-      title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54)),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+      title: Text(title, style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45)),
+      trailing: trailing ?? Icon(Icons.chevron_right, color: isDark ? Colors.white54 : Colors.black38),
       onTap: onTap,
     );
   }

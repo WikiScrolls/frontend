@@ -17,6 +17,6 @@ class Env {
   // Gemini TTS API key for text-to-speech functionality
   static const String ttsApiKey = String.fromEnvironment(
     'TTS_API_KEY',
-    defaultValue: 'AIzaSyAazU1pi0EPlPdnL-_Zd4hFHgt04OACS3Y',
+    defaultValue: 'mockkeyshooterxxxxxreplacethis',
   );
 }

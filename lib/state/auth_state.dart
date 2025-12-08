@@ -16,7 +16,8 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setSession({required String token, required UserModel user}) async {
+  Future<void> setSession(
+      {required String token, required UserModel user}) async {
     _token = token;
     _user = user;
     await ApiClient.instance.saveToken(token);
@@ -27,6 +28,11 @@ class AuthState extends ChangeNotifier {
     _token = null;
     _user = null;
     await ApiClient.instance.clearToken();
+    notifyListeners();
+  }
+
+  void setUser(UserModel user) {
+    _user = user;
     notifyListeners();
   }
 }

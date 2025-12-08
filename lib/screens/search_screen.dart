@@ -401,7 +401,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => UserProfileScreen(userId: _users[index].id),
+              builder: (_) => UserProfileScreen(
+                userId: _users[index].id,
+                searchResult: _users[index],
+              ),
             ),
           ),
         );

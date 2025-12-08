@@ -7,6 +7,7 @@ import '../api/interaction_service.dart';
 import '../api/models/user_stats.dart';
 import '../api/models/article.dart';
 import '../api/models/pagination.dart';
+import 'article_detail_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -15,7 +16,8 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
+class _ProfilePageState extends State<ProfilePage>
+    with SingleTickerProviderStateMixin {
   final _profileService = ProfileService();
   final _interactionService = InteractionService();
 
@@ -72,7 +74,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     setState(() => _loadingLiked = true);
 
     try {
-      final (articles, pagination) = await _interactionService.getMyLikedArticles(
+      final (articles, pagination) =
+          await _interactionService.getMyLikedArticles(
         page: page,
         limit: 20,
       );
@@ -98,7 +101,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     setState(() => _loadingSaved = true);
 
     try {
-      final (articles, pagination) = await _interactionService.getMySavedArticles(
+      final (articles, pagination) =
+          await _interactionService.getMySavedArticles(
         page: page,
         limit: 20,
       );
@@ -127,6 +131,72 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     ]);
   }
 
+  Future<void> _showEditBioDialog(BuildContext context) async {
+    final authState = context.read<AuthState>();
+    final user = authState.user;
+    final controller = TextEditingController(text: user?.bio ?? '');
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: const Text('Edit Bio', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          maxLength: 150,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Tell us about yourself...',
+            hintStyle: const TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.1),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child:
+                const Text('Save', style: TextStyle(color: AppColors.orange)),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result != user?.bio) {
+      try {
+        // Update bio via API
+        await _profileService.updateProfile({'bio': result});
+
+        // Update local user state
+        if (user != null) {
+          authState.setUser(user.copyWith(bio: result));
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bio updated!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update bio: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthState>().user;
@@ -140,17 +210,19 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   children: [
                     // Centered title
                     Text(
                       'Profile',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: AppColors.lightBrown,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: AppColors.lightBrown,
+                                fontWeight: FontWeight.w700,
+                              ),
                     ),
                     const SizedBox(height: 24),
 
@@ -158,13 +230,14 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     CircleAvatar(
                       radius: 56,
                       backgroundColor: Colors.white.withOpacity(0.1),
-                      child: const Icon(Icons.person, size: 56, color: Colors.white70),
+                      child: const Icon(Icons.person,
+                          size: 56, color: Colors.white70),
                     ),
                     const SizedBox(height: 16),
 
                     // Username
                     Text(
-                      username,
+                      user?.displayName ?? username,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -173,13 +246,32 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 8),
 
-                    // Bio (template)
-                    const Text(
-                      'Love learning new things every day! 📚✨',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
+                    // Bio with edit button
+                    GestureDetector(
+                      onTap: () => _showEditBioDialog(context),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user?.bio ?? 'Tap to add a bio...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: user?.bio != null
+                                    ? Colors.white70
+                                    : Colors.white38,
+                                fontSize: 14,
+                                fontStyle: user?.bio == null
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.edit,
+                              size: 14, color: Colors.white38),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -206,7 +298,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         children: [
                           const Icon(Icons.favorite, size: 18),
                           const SizedBox(width: 8),
-                          Text('Liked${_stats != null ? ' (${_stats!.totalLikes})' : ''}'),
+                          Text(
+                              'Liked${_stats != null ? ' (${_stats!.totalLikes})' : ''}'),
                         ],
                       ),
                     ),
@@ -216,7 +309,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         children: [
                           const Icon(Icons.bookmark, size: 18),
                           const SizedBox(width: 8),
-                          Text('Saved${_stats != null ? ' (${_stats!.totalSaves})' : ''}'),
+                          Text(
+                              'Saved${_stats != null ? ' (${_stats!.totalSaves})' : ''}'),
                         ],
                       ),
                     ),
@@ -264,7 +358,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       return const SizedBox(
         height: 60,
         child: Center(
-          child: CircularProgressIndicator(color: AppColors.orange, strokeWidth: 2),
+          child: CircularProgressIndicator(
+              color: AppColors.orange, strokeWidth: 2),
         ),
       );
     }
@@ -341,7 +436,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollEndNotification &&
-            notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 200) {
           onLoadMore();
         }
         return false;
@@ -418,8 +514,10 @@ class _ProfileArticleCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Open: ${article.title}')),
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ArticleDetailScreen(article: article),
+            ),
           );
         },
         child: Padding(
@@ -456,31 +554,37 @@ class _ProfileArticleCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     if (article.category != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: _parseColor(article.category!.color),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           article.category!.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 10),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 10),
                         ),
                       ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.favorite, size: 12, color: Colors.white38),
+                        const Icon(Icons.favorite,
+                            size: 12, color: Colors.white38),
                         const SizedBox(width: 4),
                         Text(
                           '${article.likeCount}',
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.visibility, size: 12, color: Colors.white38),
+                        const Icon(Icons.visibility,
+                            size: 12, color: Colors.white38),
                         const SizedBox(width: 4),
                         Text(
                           '${article.viewCount}',
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11),
                         ),
                       ],
                     ),
@@ -525,7 +629,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Colors.black,
       child: tabBar,

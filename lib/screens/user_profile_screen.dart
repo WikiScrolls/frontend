@@ -5,11 +5,17 @@ import '../api/interaction_service.dart';
 import '../api/models/public_profile.dart';
 import '../api/models/article.dart';
 import '../api/models/pagination.dart';
+import '../api/models/user_search_result.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
+  final UserSearchResult? searchResult; // Optional fallback data from search
 
-  const UserProfileScreen({super.key, required this.userId});
+  const UserProfileScreen({
+    super.key,
+    required this.userId,
+    this.searchResult,
+  });
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -105,13 +111,115 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Use fallback content if profile failed but we have search result data
+    final hasFallback = widget.searchResult != null && _profileError != null;
+    
     return Scaffold(
       backgroundColor: Colors.black,
       body: _loadingProfile
           ? const Center(child: CircularProgressIndicator(color: AppColors.orange))
-          : _profileError != null
+          : _profileError != null && !hasFallback
               ? _buildErrorState()
-              : _buildContent(),
+              : hasFallback
+                  ? _buildFallbackContent()
+                  : _buildContent(),
+    );
+  }
+
+  Widget _buildFallbackContent() {
+    final sr = widget.searchResult!;
+    
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) => [
+        SliverAppBar(
+          backgroundColor: Colors.black,
+          expandedHeight: 280,
+          pinned: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          flexibleSpace: FlexibleSpaceBar(
+            background: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 60, 24, 16),
+                child: Column(
+                  children: [
+                    // Avatar
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.white12,
+                      backgroundImage: sr.avatarUrl != null
+                          ? NetworkImage(sr.avatarUrl!)
+                          : null,
+                      child: sr.avatarUrl == null
+                          ? const Icon(Icons.person, size: 50, color: Colors.white54)
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Display name
+                    Text(
+                      sr.displayNameOrUsername,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '@${sr.username}',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Join date
+                    Text(
+                      _formatJoinDate(sr.createdAt),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 14,
+                      ),
+                    ),
+                    // Bio
+                    if (sr.profile?.bio != null && sr.profile!.bio!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        sr.profile!.bio!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.orange,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white54,
+            tabs: const [
+              Tab(text: 'Liked'),
+              Tab(text: 'Interests'),
+            ],
+          ),
+        ),
+      ],
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildLikedTab(),
+          _buildInterestsTab(null),
+        ],
+      ),
     );
   }
 
@@ -326,8 +434,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  Widget _buildInterestsTab() {
-    final interests = _profile?.interests ?? [];
+  Widget _buildInterestsTab([List<String>? overrideInterests]) {
+    final interests = overrideInterests ?? _profile?.interests ?? [];
 
     if (interests.isEmpty) {
       return const Center(

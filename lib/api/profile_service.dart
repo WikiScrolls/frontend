@@ -34,9 +34,16 @@ class ProfileService {
   }
 
   // PUT /api/profiles/me (update)
+  // If profile doesn't exist (404), creates it via POST instead
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> body) async {
     final res = await _client.put('/api/profiles/me', body: body);
     final data = _client.decode(res);
+    
+    // If profile doesn't exist, create it first
+    if (res.statusCode == 404) {
+      return createOrInitProfile(body);
+    }
+    
     if (res.statusCode >= 200 && res.statusCode < 300 && data['success'] == true) {
       return Map<String, dynamic>.from(data['data']);
     }
